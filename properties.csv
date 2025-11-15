@@ -1,0 +1,11 @@
+id,tipo,zona,precio,habitaciones,baños,pileta,metros_cubiertos,metros_descubiertos,descripcion,amenities,latitud,longitud,url
+1,Casa,Palermo,250000,3,2,True,140,60,"Casa luminosa con jardin y parrilla","Jardin;Parrilla;AireAcondicionado",-34.58,-58.42,https://link1
+2,Depto,Palermo,180000,2,1,False,80,0,"Departamento moderno, cerca de subte","Balcon;Ascensor",-34.59,-58.41,https://link2
+3,PH,Belgrano,200000,3,2,False,120,30,"PH en 2 plantas, excelente ubicacion","Patio;Parrilla",-34.56,-58.45,https://link3
+4,Casa,San Isidro,350000,4,3,True,220,100,"Casa con pileta, barrio tranquilo","Jardin;Cochera;Pileta",-34.47,-58.52,https://link4
+5,Depto,Recoleta,160000,1,1,False,45,0,"Monoambiente premium","Gym;Seguridad 24hs",-34.58,-58.40,https://link5
+6,Depto,Palermo,130000,1,1,False,38,0,"Ideal inversor cerca de comercio","Balcon",-34.58,-58.43,https://link6
+7,Casa,Colegiales,220000,3,2,False,150,50,"Casa moderna con patio","Patio;Parrilla",-34.57,-58.44,https://link7
+8,Depto,Villa Crespo,120000,2,1,False,65,0,"Departamento funcional, buena conectividad","Ascensor;Lavadero",-34.61,-58.44,https://link8
+9,Casa,Martinez,300000,4,3,True,200,80,"Amplia, ideal familia grande","Cochera;Pileta;Jardin",-34.46,-58.50,https://link9
+10,PH,Palermo,210000,2,2,False,100,40,"PH reciclado, luminoso","Patio",-34.59,-58.42,https://link10
