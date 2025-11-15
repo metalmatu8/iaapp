@@ -1,3 +1,4 @@
+
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 import chromadb
@@ -5,30 +6,30 @@ from chromadb.config import Settings
 import streamlit as st
 
 # 1. Cargar propiedades
-df = pd.read_csv('properties.csv')
 
-# 2. Crear texto para embeddings
-def make_text(row):
-    return f"{row['tipo']} en {row['zona']}. {row['descripcion']}. Amenities: {row['amenities']}. M2 cub: {row['metros_cubiertos']}, M2 desc: {row['metros_descubiertos']}"
+# 1-4. Cargar y preparar datos, embeddings y vector store, cacheado
+@st.cache_resource(show_spinner=True)
+def cargar_sistema():
+    df = pd.read_csv('properties.csv')
+    def make_text(row):
+        return f"{row['tipo']} en {row['zona']}. {row['descripcion']}. Amenities: {row['amenities']}. M2 cub: {row['metros_cubiertos']}, M2 desc: {row['metros_descubiertos']}"
+    df['text'] = df.apply(make_text, axis=1)
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    embeddings = model.encode(df['text'].tolist())
+    chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
+    if 'propiedades' in [c.name for c in chroma_client.list_collections()]:
+        chroma_client.delete_collection('propiedades')
+    collection = chroma_client.create_collection("propiedades")
+    for i, row in df.iterrows():
+        collection.add(
+            documents=[row['text']],
+            embeddings=[embeddings[i]],
+            metadatas=[row.to_dict()],
+            ids=[str(row['id'])]
+        )
+    return model, collection
 
-df['text'] = df.apply(make_text, axis=1)
-
-# 3. Generar embeddings
-model = SentenceTransformer('all-MiniLM-L6-v2')
-embeddings = model.encode(df['text'].tolist())
-
-# 4. Crear vector store local
-chroma_client = chromadb.Client(Settings(anonymized_telemetry=False))
-if 'propiedades' in [c.name for c in chroma_client.list_collections()]:
-    chroma_client.delete_collection('propiedades')
-collection = chroma_client.create_collection("propiedades")
-for i, row in df.iterrows():
-    collection.add(
-        documents=[row['text']],
-        embeddings=[embeddings[i]],
-        metadatas=[row.to_dict()],
-        ids=[str(row['id'])]
-    )
+model, collection = cargar_sistema()
 
 # 5. Interfaz simple con Streamlit
 st.title("Buscador de Propiedades Inteligente")
