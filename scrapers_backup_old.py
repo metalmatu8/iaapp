@@ -75,16 +75,16 @@ class GeorefAPI:
 
 class ArgenpropScraper:
     @staticmethod
-    def buscar_propiedades(zona: str = "Palermo", tipo: str = "Venta", limit: int = 10, debug: bool = False, stop_flag=None) -> List[Dict]:
+    def buscar_propiedades(zona: str = "Palermo", tipo: str = "Venta", limit: int = 10, debug: bool = False) -> List[Dict]:
         """Scraping de Argenprop usando Selenium."""
         if debug:
             logger.info(f"Argenprop: buscando {tipo} en {zona}...")
         
-        return ArgenpropScraper.buscar_propiedades_selenium(zona=zona, tipo=tipo, limit=limit, debug=debug, stop_flag=stop_flag)
+        return ArgenpropScraper.buscar_propiedades_selenium(zona=zona, tipo=tipo, limit=limit, debug=debug)
 
     @staticmethod
-    def buscar_propiedades_selenium(zona: str = "Palermo", tipo: str = "Venta", limit: int = 10, debug: bool = False, stop_flag=None) -> List[Dict]:
-        """Scraping de Argenprop - extrae h2 (título) + dirección + datos mejorados."""
+    def buscar_propiedades_selenium(zona: str = "Palermo", tipo: str = "Venta", limit: int = 10, debug: bool = False) -> List[Dict]:
+        """Scraping de Argenprop - extrae h2 (título) + dirección."""
         try:
             from selenium import webdriver
             from selenium.webdriver.common.by import By
@@ -97,99 +97,6 @@ class ArgenpropScraper:
 
         tipo_text = "alquiler" if tipo.lower() == "alquiler" else "venta"
         zona_slug = zona.lower().replace(" ", "-").replace("é", "e").replace("á", "a")
-        url = f"https://www.argenprop.com/departamentos/{tipo_text}/{zona_slug}"
-        
-        propiedades = []
-        driver = None
-        
-        try:
-            # Verificar si ya se solicitó detener antes de iniciar
-            if stop_flag is not None and hasattr(stop_flag, 'scraper_stop_flag') and stop_flag.scraper_stop_flag:
-                return []
-            
-            opts = Options()
-            opts.add_argument("--headless")
-            opts.add_argument("--no-sandbox")
-            opts.add_argument("--disable-dev-shm-usage")
-            opts.add_argument("--disable-gpu")
-            opts.add_argument("--window-size=1920,1080")
-            opts.add_argument("user-agent=" + random.choice(USER_AGENTS))
-            
-            try:
-                from webdriver_manager.chrome import ChromeDriverManager
-                from selenium.webdriver.chrome.service import Service
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-            except:
-                driver = webdriver.Chrome(options=opts)
-            
-            if debug:
-                logger.info(f"Argenprop: {url}")
-            
-            driver.get(url)
-            
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".card"))
-                )
-            except:
-                pass
-            
-            time.sleep(2)
-            
-            # Scroll para cargar más tarjetas
-            for _ in range(3):
-                # Verificar flag de stop entre scrolls
-                if stop_flag is not None and hasattr(stop_flag, 'scraper_stop_flag') and stop_flag.scraper_stop_flag:
-                    break
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(1)
-            
-            cards = driver.find_elements(By.CSS_SELECTOR, ".card")
-            if debug:
-                logger.info(f"Encontradas {len(cards)} tarjetas")
-            
-            for idx, card in enumerate(cards[:limit]):
-                # Verificar flag de stop en cada iteración
-                if stop_flag is not None and hasattr(stop_flag, 'scraper_stop_flag') and stop_flag.scraper_stop_flag:
-                    if debug:
-                        logger.info(f"Stop solicitado, deteniendo en tarjeta {idx}")
-                    break
-                
-                try:
-                    # Obtener URL del link
-                    href = ""
-                    try:
-                        link = card.find_element(By.TAG_NAME, "a")
-                        href = link.get_attribute("href")
-                        if not href.startswith("http"):
-                            href = "https://www.argenprop.com" + href
-                    except:
-                        continue
-                    
-                    # Usar función mejorada de extracción
-                    prop = ArgenpropScraper.extraer_datos_propiedad(card, href, zona, debug)
-                    if prop:
-                        propiedades.append(prop)
-                except Exception as e:
-                    if debug:
-                        logger.error(f"Error procesando tarjeta: {e}")
-                    continue
-            
-            if debug:
-                logger.info(f"✅ Extraídas {len(propiedades)} propiedades")
-        
-        except Exception as e:
-            logger.error(f"Error Argenprop: {e}")
-        
-        finally:
-            if driver:
-                try:
-                    driver.quit()
-                except:
-                    pass
-        
-        return propiedades
-
     @staticmethod
     def extraer_datos_propiedad(card, href, zona, debug=False):
         """Extrae datos detallados de una tarjeta de propiedad en Argenprop."""
@@ -360,15 +267,15 @@ class ArgenpropScraper:
 
 class BuscadorPropScraper:
     @staticmethod
-    def buscar_propiedades(zona: str = "Palermo", tipo: str = "venta", limit: int = 10, debug: bool = False, stop_flag=None) -> List[Dict]:
+    def buscar_propiedades(zona: str = "Palermo", tipo: str = "venta", limit: int = 10, debug: bool = False) -> List[Dict]:
         """Scraping de BuscadorProp."""
         if debug:
             logger.info(f"BuscadorProp: buscando {tipo} en {zona}...")
         
-        return BuscadorPropScraper.buscar_propiedades_selenium(zona=zona, tipo=tipo, limit=limit, debug=debug, stop_flag=stop_flag)
+        return BuscadorPropScraper.buscar_propiedades_selenium(zona=zona, tipo=tipo, limit=limit, debug=debug)
 
     @staticmethod
-    def buscar_propiedades_selenium(zona: str = "Palermo", tipo: str = "venta", limit: int = 10, debug: bool = False, stop_flag=None) -> List[Dict]:
+    def buscar_propiedades_selenium(zona: str = "Palermo", tipo: str = "venta", limit: int = 10, debug: bool = False) -> List[Dict]:
         """Scraping de BuscadorProp - extrae h2 (tipo) + dirección (span/p)."""
         try:
             from selenium import webdriver
@@ -382,10 +289,6 @@ class BuscadorPropScraper:
 
         zona_slug = zona.lower().replace(" ", "-").replace("é", "e").replace("á", "a")
         base_url = f"https://www.buscadorprop.com.ar/{tipo}-{zona_slug}"
-        
-        # Verificar si ya se solicitó detener
-        if stop_flag is not None and hasattr(stop_flag, 'scraper_stop_flag') and stop_flag.scraper_stop_flag:
-            return []
         
         opts = Options()
         opts.add_argument("--headless")
@@ -424,13 +327,7 @@ class BuscadorPropScraper:
             if debug:
                 logger.info(f"Encontrados {len(links)} links")
             
-            for idx, link in enumerate(links[:limit]):
-                # Verificar flag de stop en cada iteración
-                if stop_flag is not None and hasattr(stop_flag, 'scraper_stop_flag') and stop_flag.scraper_stop_flag:
-                    if debug:
-                        logger.info(f"Stop solicitado en BuscadorProp, deteniendo en link {idx}")
-                    break
-                
+            for link in links[:limit]:
                 try:
                     href = link.get_attribute("href")
                     if not href:
@@ -529,12 +426,9 @@ class PropertyDatabase:
                     precio_moneda TEXT,
                     habitaciones INTEGER,
                     baños INTEGER,
-                    toilettes INTEGER,
                     pileta INTEGER,
                     metros_cubiertos REAL,
                     metros_descubiertos REAL,
-                    orientacion TEXT,
-                    antiguedad INTEGER,
                     descripcion TEXT,
                     amenities TEXT,
                     latitud REAL,
@@ -590,9 +484,9 @@ class PropertyDatabase:
                     cursor.execute("""
                         INSERT OR REPLACE INTO propiedades 
                         (id, tipo, zona, precio, precio_valor, precio_moneda,
-                         habitaciones, baños, toilettes, pileta, metros_cubiertos, metros_descubiertos,
-                         orientacion, antiguedad, descripcion, amenities, latitud, longitud, url, fuente, fecha_agregado)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         habitaciones, baños, pileta, metros_cubiertos, metros_descubiertos,
+                         descripcion, amenities, latitud, longitud, url, fuente, fecha_agregado)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         prop.get("id", str(datetime.now())),
                         prop.get("tipo", ""),
@@ -602,12 +496,9 @@ class PropertyDatabase:
                         precio_moneda,
                         prop.get("habitaciones"),
                         prop.get("baños"),
-                        prop.get("toilettes"),
                         1 if prop.get("pileta") else 0,
                         prop.get("metros_cubiertos"),
                         prop.get("metros_descubiertos"),
-                        prop.get("orientacion"),
-                        prop.get("antiguedad"),
                         prop.get("descripcion", ""),
                         prop.get("amenities", ""),
                         prop.get("latitud"),
