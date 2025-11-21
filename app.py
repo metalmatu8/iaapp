@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 @st.cache_resource(show_spinner="Cargando base de datos de propiedades...")
 def cargar_sistema():
     """Carga propiedades, genera embeddings y crea el vector store."""
-    from scrapers import PropertyDatabase
+    from src.scrapers import PropertyDatabase
     from sentence_transformers import SentenceTransformer
     
     # Cargar desde SQLite
-    db = PropertyDatabase(db_path="../data/properties.db")
+    db = PropertyDatabase(db_path="data/properties.db")
     df = db.obtener_df()
     
     if df.empty:
         logger.warning("Base de datos vacía, cargando datos de ejemplo desde CSV")
-        csv_files = ['../data/properties_expanded.csv', '../data/properties.csv']
+        csv_files = ['data/properties_expanded.csv', 'data/properties.csv']
         for csv_file in csv_files:
             try:
                 if os.path.exists(csv_file):
@@ -61,7 +61,7 @@ def cargar_sistema():
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode(df['text'].tolist())
     
-    chroma_client = chromadb.PersistentClient(path="../data/chroma_data")
+    chroma_client = chromadb.PersistentClient(path="data/chroma_data")
     
     # Intentar obtener la colección existente
     try:
@@ -237,7 +237,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("## 📤 Exportar Base de Datos")
 import io
 try:
-    from scrapers import PropertyDatabase
+    from src.scrapers import PropertyDatabase
     db = PropertyDatabase()
     df_export = db.obtener_df()
     if not df_export.empty:
@@ -288,10 +288,10 @@ with st.sidebar.expander("Gestionar BD", expanded=False):
         try:
             import sqlite3
             import shutil
-            from scrapers import PropertyDatabase
+            from src.scrapers import PropertyDatabase
             
             # 1. Limpiar tabla de SQLite
-            db = PropertyDatabase(db_path="../data/properties.db")
+            db = PropertyDatabase(db_path="data/properties.db")
             conn = sqlite3.connect(db.db_path)
             cursor = conn.cursor()
             cursor.execute("DROP TABLE IF EXISTS propiedades")
@@ -300,8 +300,8 @@ with st.sidebar.expander("Gestionar BD", expanded=False):
             logger.info("Tabla propiedades eliminada de BD SQLite")
             
             # 2. Limpiar ChromaDB
-            if os.path.exists("../data/chroma_data"):
-                shutil.rmtree("../data/chroma_data")
+            if os.path.exists("data/chroma_data"):
+                shutil.rmtree("data/chroma_data")
                 logger.info("Directorio ChromaDB eliminado")
             
             # 3. Limpiar cachés
@@ -326,7 +326,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
     # Cargar datos geográficos
     @st.cache_data(show_spinner="Cargando geografía...")
     def cargar_georef():
-        from scrapers import GeorefAPI
+        from src.scrapers import GeorefAPI
         return GeorefAPI.obtener_todo()
     
     try:
@@ -381,7 +381,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             st.session_state.scraper_stop_flag = False
             st.info(f"⏳ Descargando desde {portal}... esto puede tomar 1-2 minutos")
             try:
-                from scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
+                from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
                 db = PropertyDatabase()
                 total_nuevas = 0
                 progress_bar = st.progress(0)
@@ -410,7 +410,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_bar.progress(progress)
                 
                 if not st.session_state.scraper_stop_flag:
-                    db.guardar_csv("../data/properties_expanded.csv")
+                    db.guardar_csv("data/properties_expanded.csv")
                     stats = db.obtener_estadisticas()
                     st.success(f"✅ {total_nuevas} propiedades agregadas!")
                     st.info(f"Total en BD: {stats['total_propiedades']} propiedades")
@@ -461,7 +461,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             st.session_state.scraper_stop_flag = False
             st.info(f"⏳ Descargando desde {portal_fb}... esto puede tomar 1-2 minutos")
             try:
-                from scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
+                from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
                 db = PropertyDatabase()
                 total_nuevas = 0
                 progress_bar = st.progress(0)
@@ -490,7 +490,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_bar.progress(progress)
                 
                 if not st.session_state.scraper_stop_flag:
-                    db.guardar_csv("../data/properties_expanded.csv")
+                    db.guardar_csv("data/properties_expanded.csv")
                     stats = db.obtener_estadisticas()
                     st.success(f"✅ {total_nuevas} propiedades agregadas!")
                     st.info(f"Total en BD: {stats['total_propiedades']} propiedades")
