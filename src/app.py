@@ -21,12 +21,12 @@ def cargar_sistema():
     from scrapers import PropertyDatabase
     
     # Cargar desde SQLite
-    db = PropertyDatabase()
+    db = PropertyDatabase(db_path="../data/properties.db")
     df = db.obtener_df()
     
     if df.empty:
         logger.warning("Base de datos vacía, cargando datos de ejemplo desde CSV")
-        csv_files = ['properties_expanded.csv', 'properties.csv']
+        csv_files = ['../data/properties_expanded.csv', '../data/properties.csv']
         for csv_file in csv_files:
             try:
                 if os.path.exists(csv_file):
@@ -61,17 +61,27 @@ def cargar_sistema():
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode(df['text'].tolist())
     
-    chroma_client = chromadb.PersistentClient(path="./chroma_data")
+    chroma_client = chromadb.PersistentClient(path="../data/chroma_data")
     
     # Intentar obtener la colección existente
     try:
         collection = chroma_client.get_collection("propiedades")
         logger.info(f"Colección existente encontrada con {collection.count()} documentos")
-        return model, collection, df
+        if collection.count() > 0:
+            return model, collection, df
     except:
-        logger.info("Creando colección nueva...")
+        pass
+    
+    # Si no existe o está vacía, crearla
+    logger.info("Creando colección nueva...")
+    try:
+        chroma_client.delete_collection("propiedades")
+    except:
+        pass
     
     collection = chroma_client.create_collection("propiedades")
+    logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
+    
     for i, row in df.iterrows():
         # Validar ID
         row_id = str(row['id']).strip() if row['id'] else None
@@ -96,9 +106,15 @@ def cargar_sistema():
             logger.debug(f"Error agregando a ChromaDB (fila {i}): {e}")
             continue
     
+    logger.info(f"✅ ChromaDB listo con {collection.count()} documentos")
     return model, collection, df
 
 model, collection, df_propiedades = cargar_sistema()
+
+# Validar que se cargó correctamente
+if model is None or collection is None or df_propiedades is None:
+    st.error("❌ Error: No se pudo cargar la base de datos. Verifica que exista data/properties.db o data/properties_expanded.csv")
+    st.stop()
 
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
@@ -238,7 +254,7 @@ try:
 except Exception as e:
     st.sidebar.error(f"Error: {e}")
 
-st.sidebar.markdown("**Base de datos**: SQLite (properties.db)")
+st.sidebar.markdown("**Base de datos**: SQLite (data/properties.db)")
 st.sidebar.markdown("**Versión**: MVP 2.2 (RAG + Scraping Inteligente)")
 
 # Inicializar session state para control de scraper
@@ -275,7 +291,7 @@ with st.sidebar.expander("Gestionar BD", expanded=False):
             from scrapers import PropertyDatabase
             
             # 1. Limpiar tabla de SQLite
-            db = PropertyDatabase()
+            db = PropertyDatabase(db_path="../data/properties.db")
             conn = sqlite3.connect(db.db_path)
             cursor = conn.cursor()
             cursor.execute("DROP TABLE IF EXISTS propiedades")
@@ -284,8 +300,8 @@ with st.sidebar.expander("Gestionar BD", expanded=False):
             logger.info("Tabla propiedades eliminada de BD SQLite")
             
             # 2. Limpiar ChromaDB
-            if os.path.exists("./chroma_data"):
-                shutil.rmtree("./chroma_data")
+            if os.path.exists("../data/chroma_data"):
+                shutil.rmtree("../data/chroma_data")
                 logger.info("Directorio ChromaDB eliminado")
             
             # 3. Limpiar cachés
@@ -394,7 +410,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_bar.progress(progress)
                 
                 if not st.session_state.scraper_stop_flag:
-                    db.guardar_csv("properties_expanded.csv")
+                    db.guardar_csv("../data/properties_expanded.csv")
                     stats = db.obtener_estadisticas()
                     st.success(f"✅ {total_nuevas} propiedades agregadas!")
                     st.info(f"Total en BD: {stats['total_propiedades']} propiedades")
@@ -474,7 +490,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_bar.progress(progress)
                 
                 if not st.session_state.scraper_stop_flag:
-                    db.guardar_csv("properties_expanded.csv")
+                    db.guardar_csv("../data/properties_expanded.csv")
                     stats = db.obtener_estadisticas()
                     st.success(f"✅ {total_nuevas} propiedades agregadas!")
                     st.info(f"Total en BD: {stats['total_propiedades']} propiedades")

@@ -510,7 +510,7 @@ class BuscadorPropScraper:
 
 
 class PropertyDatabase:
-    def __init__(self, db_path: str = "properties.db"):
+    def __init__(self, db_path: str = "../data/properties.db"):
         self.db_path = db_path
         self._init_db()
 
@@ -654,7 +654,7 @@ class PropertyDatabase:
             logger.error(f"Error leyendo DF: {e}")
             return pd.DataFrame()
 
-    def guardar_csv(self, csv_path: str = "properties_expanded.csv") -> None:
+    def guardar_csv(self, csv_path: str = "../data/properties_expanded.csv") -> None:
         """Exporta a CSV."""
         try:
             df = self.obtener_df()
