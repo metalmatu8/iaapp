@@ -29,9 +29,9 @@ wheels/
 *.egg
 
 # Datos locales (BD, Vector Store)
-data/properties.db
-data/chroma_data/
-data/*.csv
+#data/properties.db
+#data/chroma_data/
+#data/*.csv
 
 # Archivos de IDE
 .vscode/
