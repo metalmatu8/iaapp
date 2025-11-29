@@ -9,6 +9,9 @@ import time
 import threading
 import shutil
 
+# Detectar si estamos en Streamlit Cloud
+IS_STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SERVER_HEADLESS') == 'true' or os.path.exists('/home/appuser')
+
 # Configuración
 st.set_page_config(
     page_title="Agente RAG Inmobiliario", 
@@ -453,7 +456,12 @@ def cargar_sistema():
         # Crear estructura mínima pero válida
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer('all-MiniLM-L6-v2')
-        chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+        # Usar cliente en memoria en Streamlit Cloud, persistente en local
+        if IS_STREAMLIT_CLOUD:
+            logger.info("Detectado Streamlit Cloud - usando ChromaDB en memoria")
+            chroma_client = chromadb.EphemeralClient()
+        else:
+            chroma_client = chromadb.PersistentClient(path="data/chroma_data")
         # Crear colección vacía
         try:
             chroma_client.delete_collection("propiedades")
@@ -483,7 +491,12 @@ def cargar_sistema():
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode(df['text'].tolist())
     
-    chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+    # Usar cliente en memoria en Streamlit Cloud, persistente en local
+    if IS_STREAMLIT_CLOUD:
+        logger.info("Detectado Streamlit Cloud - usando ChromaDB en memoria")
+        chroma_client = chromadb.EphemeralClient()
+    else:
+        chroma_client = chromadb.PersistentClient(path="data/chroma_data")
     
     # Intentar obtener la colección existente
     try:
@@ -579,7 +592,11 @@ if not bd_vacia and collection is not None:
             logger.warning(f"⚠️ SYNC ERROR: ChromaDB tiene {docs_chroma} docs pero CSV tiene {docs_csv}. Regenerando...")
             # Regenerar ChromaDB completo
             try:
-                chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+                # Usar cliente en memoria en Streamlit Cloud, persistente en local
+                if IS_STREAMLIT_CLOUD:
+                    chroma_client = chromadb.EphemeralClient()
+                else:
+                    chroma_client = chromadb.PersistentClient(path="data/chroma_data")
                 try:
                     chroma_client.delete_collection("propiedades")
                 except:

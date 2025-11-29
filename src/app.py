@@ -8,6 +8,9 @@ import logging
 import time
 import threading
 
+# Detectar si estamos en Streamlit Cloud
+IS_STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SERVER_HEADLESS') == 'true' or os.path.exists('/home/appuser')
+
 # Configuración
 st.set_page_config(page_title="Agente RAG Inmobiliario", page_icon="🏠", layout="wide")
 logging.basicConfig(level=logging.INFO)
@@ -146,7 +149,12 @@ def cargar_sistema():
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode(df['text'].tolist())
     
-    chroma_client = chromadb.PersistentClient(path="../data/chroma_data")
+    # Usar cliente en memoria en Streamlit Cloud, persistente en local
+    if IS_STREAMLIT_CLOUD:
+        logger.info("Detectado Streamlit Cloud - usando ChromaDB en memoria")
+        chroma_client = chromadb.EphemeralClient()
+    else:
+        chroma_client = chromadb.PersistentClient(path="../data/chroma_data")
     
     # Intentar obtener la colección existente
     try:
