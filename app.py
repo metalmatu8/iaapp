@@ -167,6 +167,30 @@ st.markdown("""
         max-height: 88px !important;
     }
     
+    /* Ocultar botón de toggle sidebar */
+    [data-testid="stButton"] button[aria-label*="toggle_sidebar_btn"],
+    button[data-testid*="toggle_sidebar_btn"] {
+        display: none !important;
+    }
+
+    /* Ocultar input de búsqueda en multiselect y selectbox */
+    [data-testid="stMultiSelect"] input::placeholder,
+    [data-testid="stSelectbox"] input::placeholder {
+        color: transparent !important;
+    }
+    
+    [data-testid="stMultiSelect"] input,
+    [data-testid="stSelectbox"] input {
+        color: transparent !important;
+        caret-color: transparent !important;
+        font-size: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        height: 0 !important;
+        min-height: 0 !important;
+    }
+    
 
     /* Input fields - Improved for search bar */
     input, textarea, [data-testid="stTextInput"], [data-testid="stTextArea"] {
@@ -290,20 +314,21 @@ st.markdown("""
         font-weight: 500 !important;
         text-align: center !important;
         padding: 12px !important;
-        border: 2px solid rgba(59, 130, 246, 0.3) !important;
+        border: 2px solid #3b82f6 !important;
         border-radius: 8px !important;
         background: white !important;
         transition: all 0.3s ease !important;
+        outline: none !important;
     }
     
     [data-testid="stNumberInput"] input:hover {
-        border-color: rgba(59, 130, 246, 0.6) !important;
-        box-shadow: 0 0 8px rgba(59, 130, 246, 0.2) !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.4) !important;
     }
     
     [data-testid="stNumberInput"] input:focus {
-        border-color: rgb(59, 130, 246) !important;
-        box-shadow: 0 0 12px rgba(59, 130, 246, 0.4) !important;
+        border-color: #1d4ed8 !important;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.6) !important;
         outline: none !important;
     }
     
@@ -949,12 +974,13 @@ st.markdown("""
 if "sidebar_collapsed" not in st.session_state:
     st.session_state.sidebar_collapsed = False
 
-# Crear un contenedor flotante con el botón
+# Crear un contenedor flotante con el botón (OCULTO)
 col_toggle = st.columns([0.08])[0]
-with col_toggle:
-    if st.button("☰", key="toggle_sidebar_btn", help="Mostrar/Ocultar menú"):
-        st.session_state.sidebar_collapsed = not st.session_state.sidebar_collapsed
-        st.rerun()
+# Botón ocultado - no se muestra
+# with col_toggle:
+#     if st.button("☰", key="toggle_sidebar_btn", help="Mostrar/Ocultar menú"):
+#         st.session_state.sidebar_collapsed = not st.session_state.sidebar_collapsed
+#         st.rerun()
 
 # Aplicar CSS para ocultar sidebar si es necesario
 if st.session_state.sidebar_collapsed:
@@ -1218,6 +1244,8 @@ st.sidebar.markdown("---")
 # with st.sidebar.expander("Gestionar BD", expanded=False):
 #     # [TODO: Sección de gestión de BD - 285 líneas comentadas]
 
+st.sidebar.markdown("## 📥 Descarga de Propiedades")
+
 with st.sidebar.expander("Descargar de Internet", expanded=False):
     # Cargar datos geográficos
     @st.cache_data(show_spinner="Cargando geografía...")
@@ -1243,14 +1271,14 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             municipios = geo_data.get("municipios_por_provincia", {}).get(provincia, [])
             localidades_list = ["Todas"] + [m["nombre"] for m in municipios]
         
-        localidad_seleccionada = st.selectbox(
+        localidad_seleccionada = st.multiselect(
             "📍 Localidad",
             localidades_list,
-            index=0
+            default=["Palermo"]
         )
-        localidades_seleccionadas = [localidad_seleccionada]
+        localidades_seleccionadas = localidad_seleccionada if localidad_seleccionada else ["Palermo"]
         
-        limite = st.number_input("📊 Cantidad", 5, 100, 10)
+        limite = st.number_input("📊 Cantidad", 1, 100, 10)
         
         # Si selecciona "Todas", descargar de todas
         if "Todas" in localidades_seleccionadas:
@@ -1275,7 +1303,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
         if start_download:
             st.session_state.scraper_running = True
             st.session_state.scraper_stop_flag = False
-            st.info(f"⏳ Descargando desde {portal}... esto puede tomar 1-2 minutos")
+            st.info(f"⏳ Descargando Propiedades... esto puede tomar 1-2 minutos")
             
             # Crear contenedores para feedback en tiempo real
             status_container = st.empty()
@@ -1287,6 +1315,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
                 db = PropertyDatabase()
                 total_nuevas = 0
+                total_descargadas = 0
+                # Calcular total esperado de propiedades a descargar
+                total_esperado = limite * len(localidades_seleccionadas)
                 
                 for idx, localidad in enumerate(localidades_seleccionadas):
                     # Verificar si se solicitó detener
@@ -1295,8 +1326,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                         st.session_state.scraper_running = False
                         break
                     
-                    # Actualizar estado actual
-                    status_container.markdown(f"### 📍 Descargando **{localidad}**... (paso {idx + 1}/{len(localidades_seleccionadas)})")
+                    # Mostrar progreso de zona (antes de descargar)
+                    porcentaje_zona = (idx / len(localidades_seleccionadas)) * 100
+                    progress_container.progress(porcentaje_zona / 100.0, text=f"📍 Descargando **{localidad}**... ({idx + 1}/{len(localidades_seleccionadas)} zonas)")
                     details_container.info(f"⏳ Buscando propiedades de {localidad}...")
                     
                     # Descargar propiedades
@@ -1304,6 +1336,8 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     
                     # Mostrar contador durante descarga
                     props_encontradas = len(props)
+                    total_descargadas += props_encontradas
+                    
                     stats_container.metric(
                         f"🏠 {localidad}",
                         f"{props_encontradas} propiedades encontradas"
@@ -1320,11 +1354,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                         f"Total acumulado: **{total_nuevas}**"
                     )
                     
-                    # Actualizar barra de progreso
-                    progress = (idx + 1) / len(localidades_seleccionadas)
-                    progress_container.progress(progress)
-                    
-                    time.sleep(1)  # Pequeña pausa para que se vea el progreso
+                    # Actualizar barra DESPUÉS de descargar esta zona
+                    porcentaje_completado = ((idx + 1) / len(localidades_seleccionadas)) * 100
+                    progress_container.progress(porcentaje_completado / 100.0, text=f"✅ **{total_descargadas}** propiedades descargadas ({int(porcentaje_completado)}%)")
                 
                 if not st.session_state.scraper_stop_flag:
                     status_container.success(f"✅ ¡Descarga completada!")
@@ -1372,7 +1404,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 default=["Palermo"]
             )
         with col2:
-            limite = st.number_input("Cantidad", 5, 100, 10, key="limite_fallback")
+            limite = st.number_input("Cantidad", 1, 100, 10, key="limite_fallback")
         
         tipo_prop = st.radio("Tipo", ["Venta", "Alquiler"], horizontal=True, key="tipo_fallback")
         
@@ -1391,7 +1423,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
         if start_download_fb:
             st.session_state.scraper_running = True
             st.session_state.scraper_stop_flag = False
-            st.info(f"⏳ Descargando desde {portal_fb}... esto puede tomar 1-2 minutos")
+            st.info(f"⏳ Descargando Propiedades... esto puede tomar 1-2 minutos")
             
             # Crear contenedores para feedback en tiempo real
             status_container = st.empty()
@@ -1403,6 +1435,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
                 db = PropertyDatabase()
                 total_nuevas = 0
+                total_descargadas = 0
+                # Calcular total esperado de propiedades a descargar
+                total_esperado = limite * len(zonas_seleccionadas)
                 
                 for idx, zona in enumerate(zonas_seleccionadas):
                     # Verificar si se solicitó detener
@@ -1411,8 +1446,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                         st.session_state.scraper_running = False
                         break
                     
-                    # Actualizar estado actual
-                    status_container.markdown(f"### 📍 Descargando **{zona}**... (paso {idx + 1}/{len(zonas_seleccionadas)})")
+                    # Mostrar progreso de zona (antes de descargar)
+                    porcentaje_zona = (idx / len(zonas_seleccionadas)) * 100
+                    progress_container.progress(porcentaje_zona / 100.0, text=f"📍 Descargando **{zona}**... ({idx + 1}/{len(zonas_seleccionadas)} zonas)")
                     details_container.info(f"⏳ Buscando propiedades de {zona}...")
                     
                     # Descargar propiedades
@@ -1420,6 +1456,8 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     
                     # Mostrar contador durante descarga
                     props_encontradas = len(props)
+                    total_descargadas += props_encontradas
+                    
                     stats_container.metric(
                         f"🏠 {zona}",
                         f"{props_encontradas} propiedades encontradas"
@@ -1436,11 +1474,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                         f"Total acumulado: **{total_nuevas}**"
                     )
                     
-                    # Actualizar barra de progreso
-                    progress = (idx + 1) / len(zonas_seleccionadas)
-                    progress_container.progress(progress)
-                    
-                    time.sleep(1)  # Pequeña pausa para que se vea el progreso
+                    # Actualizar barra DESPUÉS de descargar esta zona
+                    porcentaje_completado = ((idx + 1) / len(zonas_seleccionadas)) * 100
+                    progress_container.progress(porcentaje_completado / 100.0, text=f"✅ **{total_descargadas}** propiedades descargadas ({int(porcentaje_completado)}%)")
                 
                 if not st.session_state.scraper_stop_flag:
                     status_container.success(f"✅ ¡Descarga completada!")
