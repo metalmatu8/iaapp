@@ -501,58 +501,56 @@ def cargar_sistema():
     # Si no existe o está vacía, crearla
     logger.info("Preparando colección ChromaDB...")
     
-    # Siempre eliminar e intentar crear nueva (más seguro que limpiar)
-    for intento in range(3):
-        try:
-            chroma_client.delete_collection("propiedades")
-            logger.debug(f"Colección eliminada (intento {intento+1})")
-        except:
-            pass
-        
-        try:
-            collection = chroma_client.create_collection("propiedades")
-            logger.debug(f"Colección creada (intento {intento+1})")
-            break
-        except Exception as e:
-            logger.debug(f"Error creando colección (intento {intento+1}): {e}")
-            if intento == 2:
-                logger.error(f"No se pudo crear colección después de 3 intentos: {e}")
-                raise
-    
-    logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
-    
-    for i, row in df.iterrows():
-        # Validar ID
-        row_id = str(row['id']).strip() if row['id'] else None
-        if not row_id or row_id == "nan" or row_id == "None":
-            logger.debug(f"Saltando fila {i}: ID vacío o inválido")
-            continue
-        
-        # Limpiar metadatos
-        metadata = row.to_dict()
-        for key in metadata:
-            if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
-                metadata[key] = ""
-        
-        try:
-            collection.add(
-                documents=[row['text']],
-                embeddings=[embeddings[i]],
-                metadatas=[metadata],
-                ids=[row_id]
-            )
-        except Exception as e:
-            logger.debug(f"Error agregando a ChromaDB (fila {i}): {e}")
-            continue
-    
+    collection = None
+    # Intentar crear colección de forma simple
     try:
-        docs_count = collection.count()
-        logger.info(f"✅ ChromaDB listo con {docs_count} documentos")
+        # Primero intentar obtener la existente
+        try:
+            collection = chroma_client.get_collection("propiedades")
+            logger.info("Usando colección existente")
+        except:
+            # Si no existe, crear nueva
+            collection = chroma_client.create_collection("propiedades")
+            logger.info("Colección nueva creada")
+        
+        # Si la colección existe pero está vacía o desincronizada, agregar documentos
+        if collection:
+            logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
+            
+            for i, row in df.iterrows():
+                # Validar ID
+                row_id = str(row['id']).strip() if row['id'] else None
+                if not row_id or row_id == "nan" or row_id == "None":
+                    continue
+                
+                # Limpiar metadatos
+                metadata = row.to_dict()
+                for key in metadata:
+                    if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
+                        metadata[key] = ""
+                
+                try:
+                    collection.add(
+                        documents=[row['text']],
+                        embeddings=[embeddings[i]],
+                        metadatas=[metadata],
+                        ids=[row_id]
+                    )
+                except:
+                    # Si falla al agregar un documento, continuar
+                    continue
+            
+            logger.info(f"✅ ChromaDB procesado")
     except Exception as e:
-        logger.warning(f"No se pudo contar documentos, pero colección debería estar lista: {e}")
-        docs_count = len(df)
+        logger.error(f"Error crítico con ChromaDB: {e}. Continuando sin ChromaDB...")
+        # Si ChromaDB falla completamente, crear un stub que no lance errores
+        collection = None
     
-    return model, collection, df
+    # Si no tenemos colección, crear un mock para que no falle
+    if collection is None:
+        logger.warning("ChromaDB no disponible, usando fallback")
+        # Retornar con colección None - manejaremos esto en las funciones de búsqueda
+        return model, None, df
 
 model, collection, df_propiedades = cargar_sistema()
 
@@ -641,29 +639,33 @@ if not bd_vacia:
 def buscar_propiedades(query, k=5):
     """Búsqueda RAG semántica mejorada con procesamiento inteligente sin API."""
     # Si la BD está vacía, no hay nada que buscar
-    if bd_vacia:
+    if bd_vacia or collection is None:
         return [], "Base de datos vacía. Descarga propiedades primero desde 'Descargar de Internet'"
     
-    # Procesar la query para entender mejor la intención
-    search_query = mejorar_query(query)
-    
-    # Búsqueda semántica (pedir más para paginación)
-    k_expanded = min(max(k, 50), len(df_propiedades))  # Mínimo 50 para mejor cobertura de zonas
-    query_emb = model.encode([search_query])
-    results = collection.query(query_embeddings=query_emb.tolist(), n_results=k_expanded)
-    
-    # Retornar registros completos de BD
-    propiedades_recomendadas = []
-    for result_id in results['ids'][0]:
-        if result_id in df_propiedades['id'].astype(str).values:
-            # Obtener el registro completo de la BD
-            prop_row = df_propiedades[df_propiedades['id'].astype(str) == result_id].iloc[0]
-            propiedades_recomendadas.append(prop_row.to_dict())
-    
-    if not propiedades_recomendadas:
-        return [], "No hay propiedades que combinen con tu búsqueda. Intenta con otros criterios."
-    
-    return propiedades_recomendadas, None
+    try:
+        # Procesar la query para entender mejor la intención
+        search_query = mejorar_query(query)
+        
+        # Búsqueda semántica (pedir más para paginación)
+        k_expanded = min(max(k, 50), len(df_propiedades))  # Mínimo 50 para mejor cobertura de zonas
+        query_emb = model.encode([search_query])
+        results = collection.query(query_embeddings=query_emb.tolist(), n_results=k_expanded)
+        
+        # Retornar registros completos de BD
+        propiedades_recomendadas = []
+        for result_id in results['ids'][0]:
+            if result_id in df_propiedades['id'].astype(str).values:
+                # Obtener el registro completo de la BD
+                prop_row = df_propiedades[df_propiedades['id'].astype(str) == result_id].iloc[0]
+                propiedades_recomendadas.append(prop_row.to_dict())
+        
+        if not propiedades_recomendadas:
+            return [], "No hay propiedades que combinen con tu búsqueda. Intenta con otros criterios."
+        
+        return propiedades_recomendadas, None
+    except Exception as e:
+        logger.warning(f"Error en búsqueda RAG: {e}")
+        return [], f"Error en búsqueda: {str(e)}"
 
 def mejorar_query(query):
     """Mejora la query usando procesamiento inteligente sin API."""
