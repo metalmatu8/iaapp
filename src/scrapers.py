@@ -395,6 +395,24 @@ class BuscadorPropScraper:
         opts.add_argument("--window-size=1920,1080")
         opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
         
+        # Detectar si Chromium está instalado en el sistema (Streamlit Cloud)
+        chromium_paths = [
+            "/usr/bin/chromium-browser",  # Streamlit Cloud
+            "/usr/bin/chromium",
+            "/snap/bin/chromium",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "C:\\Program Files\\Chromium\\Application\\chrome.exe",  # Windows
+        ]
+        chromium_binary = None
+        for path in chromium_paths:
+            if os.path.exists(path):
+                chromium_binary = path
+                logger.debug(f"Detectado Chromium en: {chromium_binary}")
+                break
+        
+        if chromium_binary:
+            opts.binary_location = chromium_binary
+        
         driver = None
         try:
             try:
@@ -689,6 +707,24 @@ class BuscadorPropScraper:
         opts.add_argument("--disable-gpu")
         opts.add_argument("--window-size=1920,1080")
         opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+        
+        # Detectar si Chromium está instalado en el sistema (Streamlit Cloud)
+        chromium_paths = [
+            "/usr/bin/chromium-browser",  # Streamlit Cloud
+            "/usr/bin/chromium",
+            "/snap/bin/chromium",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "C:\\Program Files\\Chromium\\Application\\chrome.exe",  # Windows
+        ]
+        chromium_binary = None
+        for path in chromium_paths:
+            if os.path.exists(path):
+                chromium_binary = path
+                logger.debug(f"Detectado Chromium en: {chromium_binary}")
+                break
+        
+        if chromium_binary:
+            opts.binary_location = chromium_binary
         
         out: List[Dict] = []
         driver = None
