@@ -7,9 +7,299 @@ import json
 import logging
 import time
 import threading
+import shutil
 
 # Configuración
-st.set_page_config(page_title="Agente RAG Inmobiliario", page_icon="🏠", layout="wide")
+st.set_page_config(
+    page_title="Agente RAG Inmobiliario", 
+    page_icon="🏠", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# CSS personalizado para diseño premium
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        width: 375px !important;
+        min-width: 375px !important;
+        max-width: 375px !important;
+        box-shadow: 2px 0 15px rgba(0, 0, 0, 0.08) !important;
+    }
+    
+    [data-testid="stSidebar"]::after {
+        display: none !important;
+    }
+    
+    .st-emotion-cache-10oheav {
+        width: 375px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    [data-testid="collapseSidebarButton"] {
+        display: block !important;
+    }
+    
+    /* Headers */
+    h1, h2, h3 {
+        font-weight: 700 !important;
+        letter-spacing: -0.5px !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    
+    h1 {
+        font-size: 2.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Text wrapping - palabras completas sin saltos incómodos */
+    p, span, div, li, label, caption {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: normal !important;
+    }
+    
+    /* Captions y pequeño texto */
+    .stCaption, [data-testid="stCaption"] {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        white-space: normal !important;
+    }
+    
+    /* Markdown containers */
+    [data-testid="stMarkdownContainer"] {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    
+    /* Expanders - texto visible completo */
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    
+    /* Cards y containers */
+    [data-testid="stMetricContainer"] {
+        border-radius: 12px !important;
+        padding: 1.5rem !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    [data-testid="stMetricContainer"]:hover {
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 8px !important;
+        border: none !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    /* Input fields */
+    input, textarea, [data-testid="stTextInput"], [data-testid="stTextArea"] {
+        border-radius: 8px !important;
+        border: 1.5px solid !important;
+        padding: 0.75rem 1rem !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    input:focus, textarea:focus {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+    
+    /* Expanders - contorno uniforme y consistente */
+    [data-testid="stExpander"] {
+        border: 1.5px solid rgba(200, 200, 200, 0.3) !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    [data-testid="stExpander"]:hover {
+        border-color: rgba(59, 130, 246, 0.4) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    [data-testid="stExpander"] button {
+        border-radius: 7px 7px 0 0 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    [data-testid="stExpander"] button:hover {
+        background-color: rgba(59, 130, 246, 0.05) !important;
+    }
+    
+    /* Ocultar icono de Material Design */
+    [data-testid="stExpander"] [data-testid="stIconMaterial"] {
+        display: none !important;
+    }
+    
+    /* Agregar flecha antes del texto del expander */
+    [data-testid="stExpander"] summary::before {
+        content: "▼ " !important;
+        color: rgba(59, 130, 246, 0.8) !important;
+        font-weight: bold !important;
+        margin-right: 0.25rem !important;
+        transition: transform 0.3s ease !important;
+        display: inline-block !important;
+    }
+    
+    /* Rotar flecha cuando está abierto */
+    details[open] summary::before {
+        transform: rotate(-180deg) !important;
+    }
+    
+    /* Ocultar ícono de expander */
+    [data-testid="stIconMaterial"] {
+        display: none !important;
+    }
+    
+    /* Mejorar estilo del number input (Cantidad) */
+    [data-testid="stNumberInput"] input {
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        text-align: center !important;
+        padding: 12px !important;
+        border: 2px solid rgba(59, 130, 246, 0.3) !important;
+        border-radius: 8px !important;
+        background: white !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    [data-testid="stNumberInput"] input:hover {
+        border-color: rgba(59, 130, 246, 0.6) !important;
+        box-shadow: 0 0 8px rgba(59, 130, 246, 0.2) !important;
+    }
+    
+    [data-testid="stNumberInput"] input:focus {
+        border-color: rgb(59, 130, 246) !important;
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.4) !important;
+        outline: none !important;
+    }
+    
+    [data-testid="stNumberInput"] label {
+        font-weight: 600 !important;
+        color: rgb(49, 51, 63) !important;
+        font-size: 15px !important;
+    }
+    
+    /* Botones simétricos y con mismo tamaño */
+    [data-testid="stButton"] button {
+        width: 100% !important;
+        min-height: 50px !important;
+        font-size: 15px !important;
+        font-weight: 600 !important;
+        padding: 0px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 8px !important;
+        transition: all 0.3s ease !important;
+        line-height: 1.4 !important;
+        height: 50px !important;
+    }
+    
+    [data-testid="stButton"] button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    /* ELIMINAR regla que fuerza columnas 50/50 - permitir proporciones personalizadas */
+    /* Las columnas ahora respetarán las proporciones definidas en st.columns() */
+    
+    /* Elemento container del button */
+    [data-testid="stButton"] {
+        width: 100% !important;
+    }
+    
+    /* Tabs */
+    [data-testid="stTabs"] [role="tab"] {
+        border-radius: 8px 8px 0 0 !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    /* Dividers */
+    hr {
+        border: none !important;
+        height: 1px !important;
+        margin: 1.5rem 0 !important;
+    }
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Markdown text */
+    .stMarkdown {
+        line-height: 1.6 !important;
+    }
+    
+    /* Images */
+    img {
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    /* Chat messages */
+    [data-testid="stChatMessage"] {
+        border-radius: 12px !important;
+        padding: 1rem !important;
+        margin: 0.5rem 0 !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    /* Scrollbar personalizado */
+    ::-webkit-scrollbar {
+        width: 8px !important;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        border-radius: 4px !important;
+    }
+    
+    /* Alineación del botón "Ver Todas" con el input de búsqueda */
+    .stHorizontalBlock [data-testid="stColumn"]:first-child [data-testid="stButton"] button {
+        height: 88px !important;
+        min-height: 88px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+    }
+    
+    [data-testid="stTextInput"] input {
+        height: 44px !important;
+        min-height: 44px !important;
+        padding: 10px 12px !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -25,7 +315,8 @@ def cargar_sistema():
     df = db.obtener_df()
     
     if df.empty:
-        logger.warning("Base de datos vacía, cargando datos de ejemplo desde CSV")
+        logger.warning("Base de datos vacía - lista para descargar propiedades desde Internet")
+        # Intentar cargar desde CSV si existe
         csv_files = ['data/properties_expanded.csv', 'data/properties.csv']
         for csv_file in csv_files:
             try:
@@ -39,9 +330,20 @@ def cargar_sistema():
                 logger.warning(f"Error cargando {csv_file}: {e}")
                 continue
     
+    # Si sigue vacía, devolver setup inicial vacío pero funcional
     if df.empty:
-        logger.error("No se encontraron propiedades")
-        return None, None, None
+        logger.info("Inicializando sistema con BD vacía - usuario puede descargar propiedades")
+        # Crear estructura mínima pero válida
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+        # Crear colección vacía
+        try:
+            chroma_client.delete_collection("propiedades")
+        except:
+            pass
+        collection = chroma_client.create_collection(name="propiedades")
+        return model, collection, pd.DataFrame()  # Retorna DataFrame vacío pero válido
     
     # Filtrar filas con ID vacío o inválido
     df = df[df['id'].notna() & (df['id'].astype(str).str.len() > 0)]
@@ -112,13 +414,23 @@ def cargar_sistema():
 model, collection, df_propiedades = cargar_sistema()
 
 # Validar que se cargó correctamente
-if model is None or collection is None or df_propiedades is None:
-    st.error("❌ Error: No se pudo cargar la base de datos. Verifica que exista data/properties.db o data/properties_expanded.csv")
+if model is None or collection is None:
+    st.error("❌ Error: No se pudo cargar la base de datos. Verifica que exista data/properties.db")
     st.stop()
+
+# df_propiedades puede estar vacío inicialmente (usuario descargará propiedades después)
+if df_propiedades is None:
+    df_propiedades = pd.DataFrame()
+
+bd_vacia = df_propiedades.empty
 
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
     """Búsqueda RAG semántica."""
+    # Si la BD está vacía, no hay nada que buscar
+    if bd_vacia:
+        return [], "Base de datos vacía. Descarga propiedades primero desde 'Descargar de Internet'"
+    
     # Búsqueda semántica (pedir más para paginación)
     k_expanded = min(max(k, 10), len(df_propiedades))  # Mínimo 10 para paginación
     query_emb = model.encode([query])
@@ -162,6 +474,72 @@ def extraer_palabras_clave(texto):
     
     return list(set(palabras))[:10]  # Máximo 10 palabras clave
 
+def es_imagen_propiedad_valida(url):
+    """Verifica si una URL es una imagen válida de una propiedad (no logo, ícono, banner, etc.)."""
+    if not url or not isinstance(url, str):
+        return False
+    
+    url_lower = url.lower()
+    
+    # Palabras clave que indican que NO es una propiedad
+    palabras_excluidas = [
+        # Elementos de UI
+        'logo', 'icon', 'placeholder', 'avatar', 'sprite', 'button',
+        'header', 'footer', 'nav', 'menu', 'banner', 'badge',
+        'mark', 'seal', 'watermark', 'star', 'rating',
+        # Social media
+        'instagram', 'facebook', 'youtube', 'twitter', 'tiktok', 'social', 'share', 'like',
+        # Genéricos
+        'arrow', 'cursor', 'pointer', 'default', 'hover', 'active',
+        'up', 'down', 'left', 'right', 'prev', 'next',
+        # Sliders/carrouseles sin contenido
+        'slide-', 'carousel-', 'gallery-thumb', 'thumbnail', 'thumb-',
+        # Contenido genérico
+        'placeholder-', 'no-image', 'not-found', 'empty',
+        # Branding del sitio
+        'buscadorprop', 'zonaprop', 'inmuebles', 'realtor',
+        # Patrones típicos de logos
+        '/logo/', '/brand/', '/mark/', '/seal/',
+        # Fotos muy pequeñas (probablemente decorativas)
+        'favicon', 'apple-touch', 'icon-',
+    ]
+    
+    # Excluir si contiene palabras sospechosas
+    if any(kw in url_lower for kw in palabras_excluidas):
+        return False
+    
+    # Excluir si es muy corta (probablemente no es una imagen real)
+    if len(url) < 50:
+        return False
+    
+    # Verificar extensión válida
+    extensiones_validas = ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp')
+    if not any(ext in url_lower for ext in extensiones_validas):
+        return False
+    
+    # Palabras clave que indican que SÍ es una propiedad
+    palabras_positivas = [
+        'prop', 'inmueble', 'casa', 'departamento', 'piso', 'vivienda',
+        'habitacion', 'bedroom', 'living', 'cocina', 'kitchen',
+        'exterior', 'interior', 'fachada', 'facade',
+        'ambiente', 'room', 'space',
+    ]
+    
+    # Si tiene palabras positivas, es probablemente una propiedad
+    if any(kw in url_lower for kw in palabras_positivas):
+        return True
+    
+    # Heurística: si tiene números de proporción típicos (parámetros de tamaño),
+    # probablemente sea una imagen de contenido real
+    import re
+    # Busca patrones como ?w=800&h=600 o /800x600/
+    tamaño_pattern = r'(?:w|width|h|height|size|wh)=?\d{2,4}|/\d{3,4}x\d{3,4}/'
+    if re.search(tamaño_pattern, url_lower):
+        return True
+    
+    # Por defecto, si pasó todos los filtros, asumir que es válida
+    return True
+
 def obtener_coordenadas(zona):
     """Obtiene coordenadas aproximadas por zona (datos predefinidos)."""
     coordenadas_zonas = {
@@ -185,25 +563,37 @@ def obtener_coordenadas(zona):
     return coordenadas_zonas.get(zona.lower(), {'lat': -34.7, 'lng': -58.3})
 
 def mostrar_mapa(zona):
-    """Muestra un mapa interactivo de la zona."""
-    coords = obtener_coordenadas(zona)
-    folium_map = {
-        'type': 'FeatureCollection',
-        'features': [{
-            'type': 'Feature',
-            'geometry': {
-                'type': 'Point',
-                'coordinates': [coords['lng'], coords['lat']]
-            },
-            'properties': {
-                'name': zona
-            }
-        }]
-    }
+    """Muestra un mapa interactivo de la zona con Folium."""
+    try:
+        import folium
+        from streamlit_folium import st_folium
+    except ImportError:
+        # Si no está instalado, retornar None y usar fallback
+        coords = obtener_coordenadas(zona)
+        maps_url = f"https://www.google.com/maps/search/{zona}/@{coords['lat']},{coords['lng']},15z"
+        return maps_url, coords, None
     
-    # Crear URL de Google Maps
+    coords = obtener_coordenadas(zona)
+    
+    # Crear mapa con Folium
+    mapa = folium.Map(
+        location=[coords['lat'], coords['lng']],
+        zoom_start=15,
+        tiles='OpenStreetMap'
+    )
+    
+    # Agregar marcador en la zona
+    folium.Marker(
+        location=[coords['lat'], coords['lng']],
+        popup=f"📍 {zona}",
+        tooltip=zona,
+        icon=folium.Icon(color='blue', icon='home', prefix='fa')
+    ).add_to(mapa)
+    
+    # Crear URL de Google Maps como fallback
     maps_url = f"https://www.google.com/maps/search/{zona}/@{coords['lat']},{coords['lng']},15z"
-    return maps_url, coords
+    
+    return maps_url, coords, mapa
 
 def formatear_propiedad(prop):
     """Formatea una propiedad para mostrar en la UI."""
@@ -223,106 +613,293 @@ def formatear_propiedad(prop):
         'palabras_clave': extraer_palabras_clave(prop.get('descripcion', '') + ' ' + prop.get('amenities', ''))
     }
 
+# Botón flotante para toggle sidebar
+st.markdown("""
+<style>
+    /* Contenedor flotante para el botón */
+    .floating-toggle {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 9999;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Inicializar estado para sidebar
+if "sidebar_collapsed" not in st.session_state:
+    st.session_state.sidebar_collapsed = False
+
+# Crear un contenedor flotante con el botón
+col_toggle = st.columns([0.08])[0]
+with col_toggle:
+    if st.button("☰", key="toggle_sidebar_btn", help="Mostrar/Ocultar menú"):
+        st.session_state.sidebar_collapsed = not st.session_state.sidebar_collapsed
+        st.rerun()
+
+# Aplicar CSS para ocultar sidebar si es necesario
+if st.session_state.sidebar_collapsed:
+    st.markdown("""
+    <style>
+        [data-testid="stSidebar"] {
+            display: none !important;
+        }
+        [data-testid="stMainBlockContainer"] {
+            margin-left: 0 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 # Interfaz de Streamlit
-st.title("🏠 Agente RAG Inmobiliario")
-st.markdown("### Encuentra tu vivienda ideal usando IA conversacional")
+st.header("🏠 Agente RAG Inmobiliario")
 
-# Inicializar historial de chat
+# Mostrar advertencia si BD está vacía
+if bd_vacia:
+    st.warning("""
+    ⚠️ **Base de datos vacía** - Descarga propiedades desde Internet (sidebar izquierdo)
+    """)
+
+# Inicializar historial de chat y preferencias
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-# Sidebar: Opciones de filtrado
-# Opción para descargar el CSV actualizado
-st.sidebar.markdown("---")
-st.sidebar.markdown("## 📤 Exportar Base de Datos")
-import io
-try:
+    # Cargar feedback guardado en BD
     from src.scrapers import PropertyDatabase
     db = PropertyDatabase()
-    df_export = db.obtener_df()
-    if not df_export.empty:
-        csv_bytes = df_export.to_csv(index=False).encode()
-        st.sidebar.download_button(
-            label="📥 Descargar CSV (desde SQLite)",
-            data=csv_bytes,
-            file_name="properties_export.csv",
-            mime="text/csv"
-        )
-        st.sidebar.caption(f"Total: {len(df_export)} propiedades")
-    else:
-        st.sidebar.info("Base de datos vacía")
-except Exception as e:
-    st.sidebar.error(f"Error: {e}")
-
-st.sidebar.markdown("**Base de datos**: SQLite (data/properties.db)")
-st.sidebar.markdown("**Versión**: MVP 2.2 (RAG + Scraping Inteligente)")
-
-# Inicializar session state para control de scraper
-if "scraper_running" not in st.session_state:
-    st.session_state.scraper_running = False
-if "scraper_stop_flag" not in st.session_state:
-    st.session_state.scraper_stop_flag = False
-if "scheduled_tasks" not in st.session_state:
-    st.session_state.scheduled_tasks = []
-
-# Sección para gestionar base de datos
-st.sidebar.markdown("## 📥 Base de Datos")
-with st.sidebar.expander("Gestionar BD", expanded=False):
-    st.markdown("**Acciones de BD:**")
-    col_refresh, col_clean = st.columns(2)
-    with col_refresh:
-        btn_refresh_georef = st.button("🔄 Act. Georef", key="refresh_georef")
-    with col_clean:
-        btn_clean_bd = st.button("🗑️ Limpiar BD", key="clean_bd")
+    feedback_guardado = db.obtener_feedback()
     
-    # Refrescar caché de Georef
-    if btn_refresh_georef:
-        st.cache_data.clear()
-        st.success("✅ Caché de Georef actualizado!")
-        st.info("🔄 Actualizando datos...")
-        time.sleep(1)
-        st.rerun()
+    # Convertir feedback de BD a formato de chat_history
+    chat_history = []
+    for fb in feedback_guardado:
+        chat_history.append({
+            "rol": "feedback",
+            "tipo": fb.get('tipo'),
+            "propiedad_id": fb.get('propiedad_id'),
+            "timestamp": fb.get('timestamp', '')
+        })
     
-    # Limpiar base de datos
-    if btn_clean_bd:
-        try:
-            import sqlite3
-            import shutil
-            from src.scrapers import PropertyDatabase
-            
-            # 1. Limpiar tabla de SQLite
-            db = PropertyDatabase(db_path="data/properties.db")
-            conn = sqlite3.connect(db.db_path)
-            cursor = conn.cursor()
-            cursor.execute("DROP TABLE IF EXISTS propiedades")
-            conn.commit()
-            conn.close()
-            logger.info("Tabla propiedades eliminada de BD SQLite")
-            
-            # 2. Limpiar ChromaDB
-            if os.path.exists("data/chroma_data"):
-                shutil.rmtree("data/chroma_data")
-                logger.info("Directorio ChromaDB eliminado")
-            
-            # 3. Limpiar cachés
-            st.cache_resource.clear()
-            st.cache_data.clear()
-            
-            st.success("✅ Base de datos limpiada completamente!")
-            st.info("🔄 Cargando propiedades desde CSV...")
-            
-            # 4. Recargar desde CSV automáticamente
-            time.sleep(1)
-            st.rerun()
-        except Exception as e:
-            st.error(f"❌ Error al limpiar BD: {e}")
-            logger.error(f"Error limpiando BD: {e}")
+    st.session_state.chat_history = chat_history
+
+# Inicializar modo oscuro (DESHABILITADO)
+# if "dark_mode" not in st.session_state:
+#     st.session_state.dark_mode = False
+
+st.session_state.dark_mode = False  # Mantener siempre en modo claro
+
+# Sidebar: Opciones de filtrado
+# Botón para alternar modo oscuro/claro (DESHABILITADO)
+# st.sidebar.markdown("---")
+# col_theme = st.sidebar.columns([1])[0]
+# with col_theme:
+#     if st.button(f"{'🌙 Modo Oscuro' if not st.session_state.dark_mode else '☀️ Modo Claro'}", 
+#                  use_container_width=True, 
+#                  key="theme_toggle_btn"):
+#         st.session_state.dark_mode = not st.session_state.dark_mode
+#         st.rerun()
+
+# Aplicar estilos CSS basado en modo oscuro
+if st.session_state.dark_mode:
+    dark_css = """
+    <style>
+        /* Modo oscuro - estilos base */
+        body, .stApp, [data-testid="stMainBlockContainer"] {
+            background: linear-gradient(135deg, #1a1d29 0%, #16213e 100%) !important;
+            color: #ffffff !important;
+        }
+        
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #0f1419 0%, #1a1d29 100%) !important;
+            color: #ffffff !important;
+        }
+        
+        /* Texto general */
+        p, span, label, div {
+            color: #ffffff !important;
+        }
+        
+        /* Headers oscuros */
+        h1, h2, h3, h4, h5, h6 {
+            color: #60a5fa !important;
+        }
+        
+        /* Cards oscuras */
+        [data-testid="stMetricContainer"] {
+            background: rgba(30, 35, 50, 0.8) !important;
+            border: 1px solid rgba(96, 165, 250, 0.2) !important;
+            color: #ffffff !important;
+        }
+        
+        [data-testid="stMetricContainer"]:hover {
+            background: rgba(30, 35, 50, 0.95) !important;
+            border-color: rgba(96, 165, 250, 0.4) !important;
+            box-shadow: 0 8px 25px rgba(96, 165, 250, 0.15) !important;
+        }
+        
+        [data-testid="stMetricValue"] {
+            color: #60a5fa !important;
+        }
+        
+        [data-testid="stMetricLabel"] {
+            color: #a0aec0 !important;
+        }
+        
+        /* Botones oscuros */
+        .stButton > button {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%) !important;
+            color: white !important;
+        }
+        
+        .stButton > button:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%) !important;
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5) !important;
+        }
+        
+        /* Inputs oscuros */
+        input, textarea, [data-testid="stTextInput"] {
+            background-color: rgba(20, 25, 40, 0.8) !important;
+            color: #ffffff !important;
+            border: 1.5px solid rgba(96, 165, 250, 0.2) !important;
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: #a0aec0 !important;
+        }
+        
+        input:focus, textarea:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+        }
+        
+        /* Expanders oscuros - contorno uniforme */
+        [data-testid="stExpander"] {
+            border: 1.5px solid rgba(96, 165, 250, 0.25) !important;
+            background: rgba(20, 25, 40, 0.5) !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        [data-testid="stExpander"]:hover {
+            border-color: rgba(96, 165, 250, 0.45) !important;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15) !important;
+        }
+        
+        [data-testid="stExpander"] button {
+            background: rgba(30, 35, 50, 0.6) !important;
+            color: #60a5fa !important;
+            border-radius: 7px 7px 0 0 !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        [data-testid="stExpander"] button:hover {
+            background: rgba(30, 35, 50, 0.85) !important;
+        }
+        
+        /* Contenido del expander */
+        [data-testid="stExpander"] [data-testid="stMarkdownContainer"] {
+            color: #ffffff !important;
+        }
+        
+        /* Tabs oscuros */
+        [data-testid="stTabs"] [role="tab"] {
+            color: #a0aec0 !important;
+        }
+        
+        [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: white !important;
+        }
+        
+        /* Chat messages oscuros */
+        [data-testid="stChatMessage"] {
+            background: rgba(30, 35, 50, 0.7) !important;
+            color: #ffffff !important;
+        }
+        
+        /* Dividers oscuros */
+        hr {
+            background: linear-gradient(90deg, rgba(96, 165, 250, 0) 0%, rgba(96, 165, 250, 0.3) 50%, rgba(96, 165, 250, 0) 100%) !important;
+        }
+        
+        /* Scrollbar oscuro */
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 35, 50, 0.3) !important;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #3b82f6 0%, #1e40af 100%) !important;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #2563eb 0%, #1e3a8a 100%) !important;
+        }
+        
+        /* Selectbox y dropdowns */
+        [data-testid="stSelectbox"], [data-testid="stMultiSelect"] {
+            color: #ffffff !important;
+        }
+        
+        /* Info, warning, error boxes */
+        .stInfo, .stWarning, .stError, .stSuccess {
+            color: #ffffff !important;
+        }
+        
+        /* Captions y textos pequeños */
+        .st-emotion-cache-3qzj0x {
+            color: #a0aec0 !important;
+        }
+        
+        /* Texto en todos los elementos */
+        * {
+            color: #ffffff !important;
+        }
+        
+        /* Excepto para items específicos que necesitan color especial */
+        h1, h2, h3, h4, h5, h6 {
+            color: #60a5fa !important;
+        }
+    </style>
+    """
+    st.markdown(dark_css, unsafe_allow_html=True)
+
+st.sidebar.markdown("---")
+# Opción para descargar el CSV actualizado (DESHABILITADA)
+# st.sidebar.markdown("## 📤 Exportar Base de Datos")
+# import io
+# try:
+#     from src.scrapers import PropertyDatabase
+#     db = PropertyDatabase()
+#     df_export = db.obtener_df()
+#     if not df_export.empty:
+#         csv_bytes = df_export.to_csv(index=False).encode()
+#         st.sidebar.download_button(
+#             label="📥 Descargar CSV (desde SQLite)",
+#             data=csv_bytes,
+#             file_name="properties_export.csv",
+#             mime="text/csv"
+#         )
+#         st.sidebar.caption(f"Total: {len(df_export)} propiedades")
+#     else:
+#         st.sidebar.info("Base de datos vacía")
+# except Exception as e:
+#     st.sidebar.error(f"Error: {e}")
+
+# st.sidebar.markdown("**Base de datos**: SQLite (data/properties.db)")
+# st.sidebar.markdown("**Versión**: MVP 2.2 (RAG + Scraping Inteligente)")
+
+# Inicializar session state para control de scraper (DESHABILITADO)
+# if "scraper_running" not in st.session_state:
+#     st.session_state.scraper_running = False
+# if "scraper_stop_flag" not in st.session_state:
+#     st.session_state.scraper_stop_flag = False
+# if "scheduled_tasks" not in st.session_state:
+#     st.session_state.scheduled_tasks = []
+
+# Sección para gestionar base de datos (DESHABILITADA)
+# st.sidebar.markdown("## 📥 Base de Datos")
+# DESHABILITADO - Sección de gestión de BD
+# with st.sidebar.expander("Gestionar BD", expanded=False):
+#     # [TODO: Sección de gestión de BD - 285 líneas comentadas]
 
 with st.sidebar.expander("Descargar de Internet", expanded=False):
-    st.markdown("""
-    Obtén propiedades reales de portales inmobiliarios usando Georef API:
-    """)
-    
     # Cargar datos geográficos
     @st.cache_data(show_spinner="Cargando geografía...")
     def cargar_georef():
@@ -347,22 +924,21 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             municipios = geo_data.get("municipios_por_provincia", {}).get(provincia, [])
             localidades_list = ["Todas"] + [m["nombre"] for m in municipios]
         
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            localidades_seleccionadas = st.multiselect(
-                "Localidades a descargar",
-                localidades_list,
-                default=["Todas"] if "Todas" in localidades_list else localidades_list[:1]
-            )
-        with col2:
-            limite = st.number_input("Props/zona", 5, 100, 10)
+        localidad_seleccionada = st.selectbox(
+            "📍 Localidad",
+            localidades_list,
+            index=0
+        )
+        localidades_seleccionadas = [localidad_seleccionada]
+        
+        limite = st.number_input("📊 Cantidad", 5, 100, 10)
         
         # Si selecciona "Todas", descargar de todas
         if "Todas" in localidades_seleccionadas:
             localidades_seleccionadas = [l for l in localidades_list if l != "Todas"]
         
-        # Portal y tipo
-        portal = st.selectbox("Portal", ["Argenprop", "BuscadorProp"])
+        # Portal fijo a BuscadorProp (ocultar selectbox)
+        portal = "BuscadorProp"
         tipo_prop = st.radio("Tipo", ["Venta", "Alquiler"], horizontal=True)
         
         # Botones de control
@@ -370,67 +946,103 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
         with col_download:
             start_download = st.button("⬇️ Descargar Propiedades", key="descargar_props_portal")
         with col_stop:
-            stop_download = st.button("⏹️ Detener Descarga", key="stop_scraper", disabled=not st.session_state.scraper_running)
+            stop_download = st.button("⏹️ Detener Descarga", key="stop_scraper")
         
         if stop_download:
             st.session_state.scraper_stop_flag = True
-            st.warning("⏹️ Deteniendo descarga...")
+            st.session_state.scraper_running = False
+            st.warning("⏹️ Detención solicitada... por favor espera")
         
         if start_download:
             st.session_state.scraper_running = True
             st.session_state.scraper_stop_flag = False
             st.info(f"⏳ Descargando desde {portal}... esto puede tomar 1-2 minutos")
+            
+            # Crear contenedores para feedback en tiempo real
+            status_container = st.empty()
+            progress_container = st.empty()
+            details_container = st.empty()
+            stats_container = st.empty()
+            
             try:
                 from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
                 db = PropertyDatabase()
                 total_nuevas = 0
-                progress_bar = st.progress(0)
                 
                 for idx, localidad in enumerate(localidades_seleccionadas):
                     # Verificar si se solicitó detener
                     if st.session_state.scraper_stop_flag:
-                        st.warning(f"❌ Descarga detenida en {localidad}. {total_nuevas} propiedades agregadas")
+                        status_container.warning(f"❌ Descarga detenida en {localidad}. {total_nuevas} propiedades agregadas")
                         st.session_state.scraper_running = False
                         break
                     
-                    st.write(f"📍 Descargando {localidad}...")
-                    if portal == "Argenprop":
-                        props = ArgenpropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop, limit=limite, debug=True, stop_flag=st.session_state)
-                    elif portal == "BuscadorProp":
-                        props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
-                    else:
-                        props = []
+                    # Actualizar estado actual
+                    status_container.markdown(f"### 📍 Descargando **{localidad}**... (paso {idx + 1}/{len(localidades_seleccionadas)})")
+                    details_container.info(f"⏳ Buscando propiedades de {localidad}...")
+                    
+                    # Descargar propiedades
+                    props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                    
+                    # Mostrar contador durante descarga
+                    props_encontradas = len(props)
+                    stats_container.metric(
+                        f"🏠 {localidad}",
+                        f"{props_encontradas} propiedades encontradas"
+                    )
                     
                     nuevas = db.agregar_propiedades(props)
                     total_nuevas += nuevas
-                    time.sleep(2)  # Delay entre zonas
+                    
+                    # Actualizar detalles con información detallada
+                    details_container.success(
+                        f"✓ {localidad}: "
+                        f"**{props_encontradas}** encontradas → "
+                        f"**{nuevas}** nuevas agregadas | "
+                        f"Total acumulado: **{total_nuevas}**"
+                    )
                     
                     # Actualizar barra de progreso
                     progress = (idx + 1) / len(localidades_seleccionadas)
-                    progress_bar.progress(progress)
+                    progress_container.progress(progress)
+                    
+                    time.sleep(1)  # Pequeña pausa para que se vea el progreso
                 
                 if not st.session_state.scraper_stop_flag:
+                    status_container.success(f"✅ ¡Descarga completada!")
                     db.guardar_csv("data/properties_expanded.csv")
                     stats = db.obtener_estadisticas()
-                    st.success(f"✅ {total_nuevas} propiedades agregadas!")
-                    st.info(f"Total en BD: {stats['total_propiedades']} propiedades")
-                    st.warning("⚠️ Recarga la página para ver las nuevas propiedades (F5)")
+                    
+                    # Mostrar resumen final
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("✨ Nuevas propiedades", total_nuevas)
+                    with col2:
+                        st.metric("📊 Total en BD", stats['total_propiedades'])
+                    with col3:
+                        st.metric("💰 Precio promedio", stats.get('promedio_precio', 'N/A'))
+                    
+                    details_container.empty()
+                    progress_container.progress(1.0)
+                    
+                    # Limpiar caché para recargar datos
+                    st.cache_resource.clear()
+                    st.rerun()
                 
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                st.error(f"❌ Falta instalar: {ie}")
+                status_container.error(f"❌ Falta instalar: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                status_container.error(f"❌ Error: {str(e)}")
                 st.session_state.scraper_running = False
     
     except Exception as e:
         st.error(f"Error cargando geografía: {e}")
         st.markdown("Usando localidades por defecto...")
         
-        # Fallback: localidades hardcodeadas
-        portal_fb = st.selectbox("Portal", ["Argenprop", "BuscadorProp"], key="portal_fallback")
+        # Fallback: localidades hardcodeadas - Portal fijo a BuscadorProp
+        portal_fb = "BuscadorProp"
         col1, col2 = st.columns([2, 1])
         with col1:
             zonas_seleccionadas = st.multiselect(
@@ -441,7 +1053,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 default=["Palermo"]
             )
         with col2:
-            limite = st.number_input("Props/zona", 5, 100, 10, key="limite_fallback")
+            limite = st.number_input("Cantidad", 5, 100, 10, key="limite_fallback")
         
         tipo_prop = st.radio("Tipo", ["Venta", "Alquiler"], horizontal=True, key="tipo_fallback")
         
@@ -450,159 +1062,160 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
         with col_download_fb:
             start_download_fb = st.button("⬇️ Descargar Propiedades", key="descargar_props_fallback")
         with col_stop_fb:
-            stop_download_fb = st.button("⏹️ Detener Descarga", key="stop_scraper_fb", disabled=not st.session_state.scraper_running)
+            stop_download_fb = st.button("⏹️ Detener Descarga", key="stop_scraper_fb")
         
         if stop_download_fb:
             st.session_state.scraper_stop_flag = True
-            st.warning("⏹️ Deteniendo descarga...")
+            st.session_state.scraper_running = False
+            st.warning("⏹️ Detención solicitada... por favor espera")
         
         if start_download_fb:
             st.session_state.scraper_running = True
             st.session_state.scraper_stop_flag = False
             st.info(f"⏳ Descargando desde {portal_fb}... esto puede tomar 1-2 minutos")
+            
+            # Crear contenedores para feedback en tiempo real
+            status_container = st.empty()
+            progress_container = st.empty()
+            details_container = st.empty()
+            stats_container = st.empty()
+            
             try:
                 from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
                 db = PropertyDatabase()
                 total_nuevas = 0
-                progress_bar = st.progress(0)
                 
                 for idx, zona in enumerate(zonas_seleccionadas):
                     # Verificar si se solicitó detener
                     if st.session_state.scraper_stop_flag:
-                        st.warning(f"❌ Descarga detenida en {zona}. {total_nuevas} propiedades agregadas")
+                        status_container.warning(f"❌ Descarga detenida en {zona}. {total_nuevas} propiedades agregadas")
                         st.session_state.scraper_running = False
                         break
                     
-                    st.write(f"📍 Descargando {zona}...")
-                    if portal_fb == "Argenprop":
-                        props = ArgenpropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop, limit=limite, debug=True, stop_flag=st.session_state)
-                    elif portal_fb == "BuscadorProp":
-                        props = BuscadorPropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
-                    else:
-                        props = []
+                    # Actualizar estado actual
+                    status_container.markdown(f"### 📍 Descargando **{zona}**... (paso {idx + 1}/{len(zonas_seleccionadas)})")
+                    details_container.info(f"⏳ Buscando propiedades de {zona}...")
+                    
+                    # Descargar propiedades
+                    props = BuscadorPropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                    
+                    # Mostrar contador durante descarga
+                    props_encontradas = len(props)
+                    stats_container.metric(
+                        f"🏠 {zona}",
+                        f"{props_encontradas} propiedades encontradas"
+                    )
                     
                     nuevas = db.agregar_propiedades(props)
                     total_nuevas += nuevas
-                    time.sleep(2)
+                    
+                    # Actualizar detalles con información detallada
+                    details_container.success(
+                        f"✓ {zona}: "
+                        f"**{props_encontradas}** encontradas → "
+                        f"**{nuevas}** nuevas agregadas | "
+                        f"Total acumulado: **{total_nuevas}**"
+                    )
                     
                     # Actualizar barra de progreso
                     progress = (idx + 1) / len(zonas_seleccionadas)
-                    progress_bar.progress(progress)
+                    progress_container.progress(progress)
+                    
+                    time.sleep(1)  # Pequeña pausa para que se vea el progreso
                 
                 if not st.session_state.scraper_stop_flag:
+                    status_container.success(f"✅ ¡Descarga completada!")
                     db.guardar_csv("data/properties_expanded.csv")
                     stats = db.obtener_estadisticas()
-                    st.success(f"✅ {total_nuevas} propiedades agregadas!")
-                    st.info(f"Total en BD: {stats['total_propiedades']} propiedades")
-                    st.warning("⚠️ Recarga la página para ver las nuevas propiedades (F5)")
+                    
+                    # Mostrar resumen final
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("✨ Nuevas propiedades", total_nuevas)
+                    with col2:
+                        st.metric("📊 Total en BD", stats['total_propiedades'])
+                    with col3:
+                        st.metric("💰 Precio promedio", stats.get('promedio_precio', 'N/A'))
+                    
+                    details_container.empty()
+                    progress_container.progress(1.0)
+                    
+                    # Limpiar caché para recargar datos
+                    st.cache_resource.clear()
+                    st.rerun()
                 
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                st.error(f"❌ Falta instalar: {ie}")
+                status_container.error(f"❌ Falta instalar: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                status_container.error(f"❌ Error: {str(e)}")
                 st.session_state.scraper_running = False
 
-# Sección de tareas programadas
-st.sidebar.markdown("## 🕐 Tareas Programadas")
-with st.sidebar.expander("Configurar Descarga Automática", expanded=False):
-    st.markdown("""
-    Configura descargas automáticas de propiedades:
-    """)
+# DESHABILITADO - Sección de tareas programadas
+# st.sidebar.markdown("## 🕐 Tareas Programadas")
+# with st.sidebar.expander("Configurar Descarga Automática", expanded=False):
+#     # [TODO: Sección de tareas programadas comentada - 100 líneas]
+
+st.sidebar.markdown("---")
+
+# NUEVA: Análisis de propiedades marcadas
+st.sidebar.markdown("## 📊 Análisis de Preferencias")
+with st.sidebar.expander("Ver Propiedades Marcadas", expanded=False):
+    # Contar feedback del chat history
+    positivos = [e for e in st.session_state.chat_history if e.get('rol') == 'feedback' and e.get('tipo') == 'positivo']
+    negativos = [e for e in st.session_state.chat_history if e.get('rol') == 'feedback' and e.get('tipo') == 'negativo']
     
-    col1, col2 = st.columns(2)
-    with col1:
-        habilitar_tarea = st.checkbox("Habilitar tarea programada")
-    with col2:
-        hora_ejecucion = st.time_input("Hora de ejecución", value=dt_time(22, 0))
+    # Mostrar resumen
+    col_pos, col_neg = st.columns(2)
+    with col_pos:
+        st.metric("👍 Me Interesa", len(positivos))
+    with col_neg:
+        st.metric("👎 No Me Interesa", len(negativos))
     
-    if habilitar_tarea:
-        st.info("⏰ Tarea programada: Se ejecutará diariamente")
+    # Mostrar detalles de propiedades marcadas
+    if positivos or negativos:
+        st.markdown("### 👍 Propiedades de Interés")
+        if positivos:
+            for fb in positivos:
+                # Buscar la propiedad en la BD
+                prop_id = fb.get('propiedad_id')
+                try:
+                    # Obtener info de la propiedad desde el DataFrame
+                    if not df_propiedades.empty:
+                        prop_info = df_propiedades[df_propiedades['id'] == prop_id]
+                        if not prop_info.empty:
+                            prop = prop_info.iloc[0]
+                            st.caption(f"🏠 **{prop.get('tipo', 'Propiedad')}** - {prop.get('zona', 'N/A')}")
+                            st.caption(f"💰 {prop.get('precio', 'N/A')}")
+                except:
+                    st.caption(f"ID: {prop_id}")
+                st.divider()
+        else:
+            st.info("Sin propiedades marcadas aún")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            zona_automatica = st.selectbox(
-                "Zona para descarga automática",
-                ["Palermo", "Recoleta", "San Isidro", "Belgrano", "Temperley"],
-                key="zona_auto"
-            )
-        with col2:
-            portal_automatico = st.selectbox(
-                "Portal para descarga automática",
-                ["BuscadorProp", "Argenprop"],
-                key="portal_auto"
-            )
-        
-        props_automaticas = st.slider("Props a descargar", 5, 50, 10, key="props_auto")
-        tipo_automatico = st.radio("Tipo de descarga automática", ["Venta", "Alquiler"], key="tipo_auto")
-        
-        if st.button("💾 Guardar Configuración de Tarea"):
-            tarea_config = {
-                "id": f"tarea_{datetime.now().timestamp()}",
-                "hora": str(hora_ejecucion),
-                "zona": zona_automatica,
-                "portal": portal_automatico,
-                "props": props_automaticas,
-                "tipo": tipo_automatico,
-                "habilitada": True,
-                "fecha_creacion": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            
-            # Guardar en archivo JSON
-            try:
-                tareas_file = "scheduled_tasks.json"
-                tareas_existentes = []
-                if os.path.exists(tareas_file):
-                    with open(tareas_file, 'r') as f:
-                        tareas_existentes = json.load(f)
-                
-                tareas_existentes.append(tarea_config)
-                
-                with open(tareas_file, 'w') as f:
-                    json.dump(tareas_existentes, f, indent=2)
-                
-                st.success(f"✅ Tarea programada para {hora_ejecucion} en {zona_automatica}")
-                st.session_state.scheduled_tasks = tareas_existentes
-            except Exception as e:
-                st.error(f"Error guardando tarea: {e}")
-    
-    # Mostrar tareas programadas existentes
-    try:
-        tareas_file = "scheduled_tasks.json"
-        if os.path.exists(tareas_file):
-            with open(tareas_file, 'r') as f:
-                tareas = json.load(f)
-            
-            if tareas:
-                st.markdown("### 📋 Tareas Configuradas")
-                for idx, tarea in enumerate(tareas):
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.write(f"""
-                        **Tarea {idx + 1}**
-                        - ⏰ Hora: {tarea['hora']}
-                        - 📍 Zona: {tarea['zona']}
-                        - 🏢 Portal: {tarea['portal']}
-                        - 📊 Props: {tarea['props']}
-                        - 🔄 Tipo: {tarea['tipo']}
-                        - ✅ Habilitada: {'Sí' if tarea['habilitada'] else 'No'}
-                        """)
-                    with col2:
-                        if st.button("🗑️ Eliminar", key=f"delete_task_{idx}"):
-                            tareas.pop(idx)
-                            with open(tareas_file, 'w') as f:
-                                json.dump(tareas, f, indent=2)
-                            st.success("Tarea eliminada")
-                            st.rerun()
-    except Exception as e:
-        st.warning(f"No hay tareas configuradas aún")
+        st.markdown("### 👎 Propiedades Descartadas")
+        if negativos:
+            for fb in negativos:
+                prop_id = fb.get('propiedad_id')
+                try:
+                    if not df_propiedades.empty:
+                        prop_info = df_propiedades[df_propiedades['id'] == prop_id]
+                        if not prop_info.empty:
+                            prop = prop_info.iloc[0]
+                            st.caption(f"🏠 **{prop.get('tipo', 'Propiedad')}** - {prop.get('zona', 'N/A')}")
+                            st.caption(f"💰 {prop.get('precio', 'N/A')}")
+                except:
+                    st.caption(f"ID: {prop_id}")
+                st.divider()
+        else:
+            st.info("Sin propiedades descartadas aún")
 
 st.sidebar.markdown("---")
 
 # Chat principal
-st.markdown("### 💬 Búsqueda Inteligente")
+st.subheader("💬 Búsqueda Inteligente", divider=False)
 
 # Inicializar session state para búsqueda automática
 if "search_query" not in st.session_state:
@@ -614,20 +1227,37 @@ if "search_page" not in st.session_state:
 if "last_input_time" not in st.session_state:
     st.session_state.last_input_time = 0
 
+# Opción para ver todas las propiedades
+col_all, col_search = st.columns([0.1, 1])
+with col_all:
+    if st.button("📋 Ver Todas", key="btn_all_props", use_container_width=True):
+        # Cargar todas las propiedades desde la BD
+        from src.scrapers import PropertyDatabase
+        db = PropertyDatabase()
+        df_all = db.obtener_df()
+        if not df_all.empty:
+            props_all = df_all.to_dict('records')
+            st.session_state.search_results = props_all
+            st.session_state.search_query = "TODAS"
+            st.session_state.search_page = 0
+        else:
+            st.warning("No hay propiedades en la BD")
+
 # Callback que se ejecuta cuando el usuario escribe
 def on_search_input_change():
     st.session_state.last_input_time = time.time()
     st.session_state.search_page = 0
 
-perfil = st.text_input(
-    "Describe tu familia y preferencias:",
-    placeholder="Ej: Familia de 4 personas, buscan casa luminosa en Palermo con 3 habitaciones",
-    key="user_input",
-    on_change=on_search_input_change
-)
+with col_search:
+    perfil = st.text_input(
+        "O describe tu familia y preferencias:",
+        placeholder="Ej: Familia de 4 personas, buscan casa luminosa en Palermo con 3 habitaciones",
+        key="user_input",
+        on_change=on_search_input_change
+    )
 
-# Búsqueda automática con debounce (2 segundos)
-if perfil:
+# Búsqueda automática con debounce (2 segundos) - SOLO si query != "TODAS"
+if perfil and st.session_state.search_query != "TODAS":
     elapsed = time.time() - st.session_state.last_input_time
     
     # Si han pasado 2 segundos desde que dejó de escribir, ejecutar búsqueda
@@ -649,7 +1279,7 @@ if perfil:
         with st.spinner("⏳ Esperando para buscar..."):
             time.sleep(0.1)
         st.rerun()
-else:
+elif perfil == "" and st.session_state.search_query != "TODAS":
     st.session_state.search_results = []
     st.session_state.search_query = ""
 
@@ -681,84 +1311,177 @@ if st.session_state.search_results:
     st.success(f"✅ Encontré {len(st.session_state.search_results)} propiedad(es) relevante(s):")
     
     for i, prop in enumerate(propiedades, start=start_idx + 1):
-        with st.expander(f"**{i}. {prop['tipo']} en {prop['zona']}** - USD {prop['precio']}", expanded=(i==start_idx+1)):
-            # Información básica en 2 columnas
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Habitaciones", prop.get('habitaciones') or "N/A")
-                st.metric("Baños", prop.get('baños') or "N/A")
-                st.metric("M² Cubiertos", prop.get('metros_cubiertos') or "N/A")
-            with col2:
-                st.metric("M² Descubiertos", prop.get('metros_descubiertos') or "N/A")
-                pileta_text = "✅ Sí" if prop.get('pileta') else "❌ No"
-                st.metric("Pileta", pileta_text)
+        with st.expander(f"**{i}. {prop['tipo']} en {prop['zona']}** - {prop['precio']}", expanded=(i==start_idx+1)):
+            
+            # Layout principal: información a la izquierda y mapa a la derecha - SIMÉTRICOS
+            col_left, col_right = st.columns([1, 1])
+            
+            with col_left:
+                # Información básica compacta en 2 columnas
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Habitaciones", prop.get('habitaciones') or "N/A")
+                    st.metric("Baños", prop.get('baños') or "N/A")
+                with col2:
+                    st.metric("M² Cubiertos", prop.get('metros_cubiertos') or "N/A")
+                    pileta_text = "✅ Sí" if prop.get('pileta') else "❌ No"
+                    st.metric("Pileta", pileta_text)
+                
+                # Detalles compactos en una sola línea
+                if prop.get('direccion') or prop.get('estado') or prop.get('antiguedad'):
+                    info_cols = st.columns(3)
+                    if prop.get('direccion'):
+                        with info_cols[0]:
+                            st.caption(f"📍 {prop['direccion']}")
+                    if prop.get('estado'):
+                        with info_cols[1]:
+                            st.caption(f"🏗️ {prop['estado']}")
+                    if prop.get('antiguedad'):
+                        with info_cols[2]:
+                            st.caption(f"📅 {prop['antiguedad']} años")
+                
+                # Descripción compacta
+                if prop.get('descripcion'):
+                    st.caption(f"📝 {prop['descripcion'][:150]}...")
+                
+                # Amenities compactos
+                if prop.get('amenities'):
+                    st.caption(f"🏠 {prop['amenities'][:150]}...")
+                
+                # Palabras clave
+                palabras_clave = prop.get('palabras_clave', [])
+                if palabras_clave:
+                    st.write(" ".join([f"`{p.capitalize()}`" for p in palabras_clave]))
+                
+                # Ubicación y links
+                maps_url, coords, mapa = mostrar_mapa(prop.get('zona', ''))
+                loc_cols = st.columns([1, 1])
+                with loc_cols[0]:
+                    st.caption(f"[🗺️ Maps]({maps_url})")
+                with loc_cols[1]:
+                    if prop.get('url'):
+                        st.caption(f"[🔗 Portal]({prop['url']})")
+            
+            with col_right:
+                # MAPA A LA DERECHA - ANCHO COMPLETO
+                st.subheader("🗺️ Ubicación", divider=False)
+                if coords:
+                    map_data = {
+                        'latitude': [coords['lat']],
+                        'longitude': [coords['lng']]
+                    }
+                    st.map(map_data, zoom=15, use_container_width=True, height=300)
+            
+            # GALERÍA DE FOTOS EN LA PARTE INFERIOR - ANCHO COMPLETO
+            if prop.get('fotos'):
                 try:
-                    precio_num = float(str(prop.get('precio', 0)).replace('USD', '').replace('$', '').split()[0])
-                    st.metric("Precio", f"USD {precio_num:,.0f}")
+                    import json
+                    fotos = prop.get('fotos')
+                    if isinstance(fotos, str):
+                        fotos = json.loads(fotos)
+                    
+                    # FILTRAR: Excluir imágenes que no sean de propiedades
+                    fotos_validas = [f for f in fotos if es_imagen_propiedad_valida(f)]
+                    
+                    if fotos_validas and len(fotos_validas) > 0:
+                        st.markdown("### 📸 Galería")
+                        
+                        # Inicializar índice
+                        gallery_key = f"gallery_{prop['id']}"
+                        if gallery_key not in st.session_state:
+                            st.session_state[gallery_key] = 0
+                        
+                        current_photo_idx = st.session_state[gallery_key]
+                        
+                        # Asegurar que el índice no excede las fotos válidas
+                        if current_photo_idx >= len(fotos_validas):
+                            current_photo_idx = 0
+                            st.session_state[gallery_key] = 0
+                        
+                        # Mostrar foto sin espacios
+                        st.image(fotos_validas[current_photo_idx], use_container_width=True)
+                        
+                        # Contador centrado
+                        st.caption(f"📷 {current_photo_idx + 1}/{len(fotos_validas)}", unsafe_allow_html=False)
+                        
+                        # Botones de navegación centrados
+                        nav_cols = st.columns([0.3, 0.1, 0.1, 0.3])
+                        with nav_cols[1]:
+                            if st.button("⬅️", key=f"prev_{prop['id']}", use_container_width=True):
+                                st.session_state[gallery_key] = (current_photo_idx - 1) % len(fotos_validas)
+                                st.rerun()
+                        with nav_cols[2]:
+                            if st.button("➡️", key=f"next_{prop['id']}", use_container_width=True):
+                                st.session_state[gallery_key] = (current_photo_idx + 1) % len(fotos_validas)
+                                st.rerun()
+                except Exception as e:
+                    pass
+            elif prop.get('foto_portada'):
+                # Mostrar foto portada si no hay galería
+                try:
+                    foto_portada = prop['foto_portada']
+                    if foto_portada and es_imagen_propiedad_valida(foto_portada):
+                        st.markdown("### 📸 Foto")
+                        st.image(foto_portada, use_container_width=True)
                 except:
-                    st.metric("Precio", prop.get('precio', 'N/A'))
+                    pass
             
-            # Descripción
-            st.markdown("### 📝 Descripción")
-            st.write(prop.get('descripcion', 'N/A'))
+            # Feedback debajo del contenido (ancho completo)
+            st.markdown("---")
             
-            # Amenities
-            st.markdown("### 🏠 Amenities")
-            st.write(prop.get('amenities', 'N/A'))
+            # Verificar si ya fue marcada
+            prop_id = prop['id']
+            ya_marcada_positivo = any(e.get('propiedad_id') == prop_id and e.get('tipo') == 'positivo' for e in st.session_state.chat_history if e.get('rol') == 'feedback')
+            ya_marcada_negativo = any(e.get('propiedad_id') == prop_id and e.get('tipo') == 'negativo' for e in st.session_state.chat_history if e.get('rol') == 'feedback')
+            # Si ya fue marcada en cualquier categoría, ambos botones se deshabilitan
+            ya_marcada = ya_marcada_positivo or ya_marcada_negativo
             
-            # Palabras clave
-            palabras_clave = prop.get('palabras_clave', [])
-            if palabras_clave:
-                st.markdown("### 🔑 Características Destacadas")
-                cols = st.columns(len(palabras_clave))
-                for idx, palabra in enumerate(palabras_clave):
-                    with cols[idx % len(palabras_clave)]:
-                        st.info(f"• {palabra.capitalize()}")
-            
-            # Ubicación
-            st.markdown("### 📍 Ubicación")
-            maps_url, coords = mostrar_mapa(prop.get('zona', ''))
-            col_map, col_coords = st.columns([2, 1])
-            with col_map:
-                st.markdown(f"[🗺️ Ver en Google Maps]({maps_url})")
-            with col_coords:
-                st.caption(f"Lat: {coords['lat']:.4f}, Lng: {coords['lng']:.4f}")
-            
-            # Link a la propiedad
-            if prop.get('url'):
-                st.markdown(f"[🔗 Ver propiedad en portal]({prop['url']})")
-            
-            # Feedback
-            st.markdown("### 👍 Tu opinión")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button("👍 Me interesa", key=f"like_{prop['id']}"):
-                    st.session_state.chat_history.append({
-                        "rol": "feedback",
-                        "tipo": "positivo",
-                        "propiedad_id": prop['id'],
-                        "timestamp": datetime.now().strftime("%H:%M:%S")
-                    })
-                    st.success("Feedback registrado")
-            with col3:
-                if st.button("👎 No es para mí", key=f"dislike_{prop['id']}"):
-                    st.session_state.chat_history.append({
-                        "rol": "feedback",
-                        "tipo": "negativo",
-                        "propiedad_id": prop['id'],
-                        "timestamp": datetime.now().strftime("%H:%M:%S")
-                    })
-                    st.info("Feedback registrado")
+            col_like, col_dislike = st.columns([1, 1])
+            with col_like:
+                if ya_marcada:
+                    st.button("✅ Ya marcada" if ya_marcada_positivo else "✅ Ya tiene feedback", disabled=True, use_container_width=True, key=f"like_disabled_{prop['id']}")
+                else:
+                    if st.button("👍 Me interesa", key=f"like_{prop['id']}", use_container_width=True):
+                        timestamp = datetime.now().strftime("%H:%M:%S")
+                        st.session_state.chat_history.append({
+                            "rol": "feedback",
+                            "tipo": "positivo",
+                            "propiedad_id": prop['id'],
+                            "timestamp": timestamp
+                        })
+                        # Guardar en BD
+                        from src.scrapers import PropertyDatabase
+                        db = PropertyDatabase()
+                        db.guardar_feedback(prop['id'], "positivo", timestamp)
+                        st.success("✓ Guardado")
+                        st.rerun()
+            with col_dislike:
+                if ya_marcada:
+                    st.button("✅ Ya marcada" if ya_marcada_negativo else "✅ Ya tiene feedback", disabled=True, use_container_width=True, key=f"dislike_disabled_{prop['id']}")
+                else:
+                    if st.button("👎 No es para mí", key=f"dislike_{prop['id']}", use_container_width=True):
+                        timestamp = datetime.now().strftime("%H:%M:%S")
+                        st.session_state.chat_history.append({
+                            "rol": "feedback",
+                            "tipo": "negativo",
+                            "propiedad_id": prop['id'],
+                            "timestamp": timestamp
+                        })
+                        # Guardar en BD
+                        from src.scrapers import PropertyDatabase
+                        db = PropertyDatabase()
+                        db.guardar_feedback(prop['id'], "negativo", timestamp)
+                        st.info("✓ Guardado")
+                        st.rerun()
 
-# Mostrar historial
-if st.session_state.chat_history:
-    st.markdown("---")
-    st.markdown("### 📋 Historial de Búsqueda")
-    for entrada in st.session_state.chat_history:
-        if entrada['rol'] == 'usuario':
-            st.write(f"**Usuario ({entrada['timestamp']}):** {entrada['mensaje']}")
-        elif entrada['rol'] == 'asistente':
-            st.write(f"**Asistente ({entrada['timestamp']}):** {entrada['mensaje']}")
-        elif entrada['rol'] == 'feedback':
-            emoji = "👍" if entrada['tipo'] == 'positivo' else "👎"
-            st.write(f"{emoji} Feedback en propiedad #{entrada['propiedad_id']}")
+# Mostrar historial compacto
+if st.session_state.chat_history and len(st.session_state.chat_history) > 0:
+    with st.expander(f"📋 Historial ({len(st.session_state.chat_history)} eventos)", expanded=False):
+        for entrada in st.session_state.chat_history:
+            if entrada['rol'] == 'usuario':
+                st.caption(f"**Usuario ({entrada['timestamp']}):** {entrada['mensaje']}")
+            elif entrada['rol'] == 'asistente':
+                st.caption(f"**Asistente ({entrada['timestamp']}):** {entrada['mensaje']}")
+            elif entrada['rol'] == 'feedback':
+                emoji = "👍" if entrada['tipo'] == 'positivo' else "👎"
+                st.caption(f"{emoji} Propiedad #{entrada['propiedad_id']}")

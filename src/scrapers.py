@@ -14,6 +14,7 @@ import random
 from random import uniform
 import time
 import urllib.parse
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -360,6 +361,281 @@ class ArgenpropScraper:
 
 class BuscadorPropScraper:
     @staticmethod
+    def extraer_detalles_propiedad(url: str, debug: bool = False) -> Dict:
+        """Extrae detalles completos de una página de propiedad individual en BuscadorProp."""
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+        except:
+            logger.error("selenium no disponible para extraer detalles")
+            return {}
+        
+        detalles = {
+            "direccion": None,
+            "ambientes": None,
+            "dormitorios": None,
+            "baños": None,
+            "antiguedad": None,
+            "estado": None,
+            "superficie_total": None,
+            "superficie_cubierta": None,
+            "pisos": None,
+            "fotos": [],
+            "precio_completo": None,
+        }
+        
+        opts = Options()
+        opts.add_argument("--headless")
+        opts.add_argument("--no-sandbox")
+        opts.add_argument("--disable-dev-shm-usage")
+        opts.add_argument("--disable-gpu")
+        opts.add_argument("--window-size=1920,1080")
+        opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+        
+        driver = None
+        try:
+            try:
+                from webdriver_manager.chrome import ChromeDriverManager
+                from selenium.webdriver.chrome.service import Service
+                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+            except:
+                driver = webdriver.Chrome(options=opts)
+            
+            driver.get(url)
+            time.sleep(3)
+            
+            # Extraer dirección
+            try:
+                direccion = driver.find_element(By.CSS_SELECTOR, "h1, .property-address, [class*='direccion'], [class*='address']").text
+                detalles["direccion"] = direccion
+            except:
+                pass
+            
+            # Extraer precio completo
+            try:
+                # Buscar elemento con "USD" o "$"
+                for elem in driver.find_elements(By.XPATH, "//*[contains(text(), 'USD') or contains(text(), '$')]"):
+                    text = elem.text.strip()
+                    if any(char.isdigit() for char in text):
+                        detalles["precio_completo"] = text
+                        if debug:
+                            logger.info(f"Precio extraído: {text}")
+                        break
+            except:
+                pass
+            
+            # Extraer características (ambientes, dormitorios, baños, etc.)
+            try:
+                # Buscar en los textos de la página
+                page_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+                
+                # Ambientes
+                if "ambiente" in page_text:
+                    for elem in driver.find_elements(By.XPATH, "//*[contains(text(), 'ambiente') or contains(text(), 'Ambiente')]"):
+                        text = elem.text.strip()
+                        try:
+                            # Extraer número antes de "ambiente"
+                            num = int(text.split()[0])
+                            detalles["ambientes"] = num
+                            break
+                        except:
+                            pass
+                
+                # Dormitorios
+                if "dormitorio" in page_text:
+                    for elem in driver.find_elements(By.XPATH, "//*[contains(text(), 'dormitorio') or contains(text(), 'Dormitorio')]"):
+                        text = elem.text.strip()
+                        try:
+                            num = int(text.split()[0])
+                            detalles["dormitorios"] = num
+                            break
+                        except:
+                            pass
+                
+                # Baños
+                if "baño" in page_text:
+                    for elem in driver.find_elements(By.XPATH, "//*[contains(text(), 'baño') or contains(text(), 'Baño')]"):
+                        text = elem.text.strip()
+                        try:
+                            num = int(text.split()[0])
+                            detalles["baños"] = num
+                            break
+                        except:
+                            pass
+                
+                # Antigüedad
+                if "año" in page_text and "antigüedad" in page_text:
+                    for elem in driver.find_elements(By.XPATH, "//*[contains(text(), 'año') and contains(text(), 'ntiguedad')]"):
+                        text = elem.text.strip()
+                        try:
+                            num = int(text.split()[0])
+                            detalles["antiguedad"] = num
+                            break
+                        except:
+                            pass
+                
+                # Estado
+                estado_keywords = ["refaccionar", "buen estado", "excelente", "a reformar"]
+                for keyword in estado_keywords:
+                    if keyword in page_text:
+                        detalles["estado"] = keyword.title()
+                        break
+                
+                # Superficie total
+                if "m2" in page_text or "m²" in page_text:
+                    try:
+                        # Buscar "210m2" o "210 m2"
+                        import re
+                        matches = re.findall(r'(\d+)\s*m[2²]', page_text)
+                        if matches:
+                            # El primer match suele ser superficie total
+                            detalles["superficie_total"] = int(matches[0])
+                            # El segundo match suele ser cubierta
+                            if len(matches) > 1:
+                                detalles["superficie_cubierta"] = int(matches[1])
+                    except:
+                        pass
+                
+                # Pisos
+                if "piso" in page_text:
+                    for elem in driver.find_elements(By.XPATH, "//*[contains(text(), 'piso') or contains(text(), 'Piso')]"):
+                        text = elem.text.strip()
+                        if text.lower().startswith(('1 ', '2 ', '3 ', '4 ', '5 ', '6 ')):
+                            try:
+                                num = int(text.split()[0])
+                                detalles["pisos"] = num
+                                break
+                            except:
+                                pass
+            except Exception as e:
+                if debug:
+                    logger.info(f"Error extrayendo características: {e}")
+            
+            # Extraer fotos
+            try:
+                fotos = []
+                
+                # Esperar a que carguen las imágenes
+                time.sleep(2)
+                
+                # Palabras clave para excluir (logos, iconos, etc)
+                exclude_keywords = [
+                    'logo', 'icon', 'placeholder', 'avatar', 'sprite', 'button',
+                    'header', 'footer', 'nav', 'menu', 'banner', 'badge',
+                    'mark', 'seal', 'watermark', 'instagram', 'facebook',
+                    'youtube', 'twitter', 'social', 'share', 'arrow',
+                    'chevron', 'check', 'close', 'spinner', 'loading',
+                    'flag', 'star', 'rating', 'dot', 'circle', 'square',
+                    'buscadorprop', 'zonaprop', 'logo', 'badge', 'seal',
+                    'button', 'arrow', 'heart', 'share', 'favorite',
+                    'tiktok', 'instagram', 'facebook', 'youtube', 'twitter',
+                    'social', 'watermark', 'copyright', 'realtor'
+                ]
+                
+                def is_valid_photo(src):
+                    """Verifica si una URL es una foto válida de una propiedad (no logo/icon/banner)."""
+                    if not src or len(src) < 50:
+                        return False
+                    
+                    src_lower = src.lower()
+                    
+                    # Excluir si contiene palabras clave sospechosas
+                    if any(kw in src_lower for kw in exclude_keywords):
+                        return False
+                    
+                    # Excluir patrones típicos de logos/icons
+                    if any(pattern in src_lower for pattern in ['favicon', 'icon-', '/logo/', '/brand/', '/mark/', '/seal/', 'default-image', 'no-image', 'placeholder']):
+                        return False
+                    
+                    # Incluir solo imágenes válidas
+                    if not any(ext in src_lower for ext in ['.jpg', '.jpeg', '.png', '.webp', '.gif']):
+                        return False
+                    
+                    # Heurística: URLs de propiedades reales suelen tener patrones de dimensiones
+                    # o IDs largos (¿w=800&h=600, /800x600/, etc.)
+                    import re
+                    size_pattern = r'(?:w|width|h|height|size)=?\d{2,4}|/\d{3,4}x\d{3,4}/'
+                    id_pattern = r'/\d{6,}|id=\d{6,}|prop_\d+|image_\d+'
+                    
+                    if re.search(size_pattern, src_lower) or re.search(id_pattern, src_lower):
+                        return True
+                    
+                    # Si la URL es muy larga y tiene slashes con muchos parámetros, probablemente sea una imagen real
+                    if len(src) > 100 and src.count('/') > 4:
+                        return True
+                    
+                    return False
+                
+                # Estrategia 1: Buscar en atributos data-src (lazy loading)
+                for img in driver.find_elements(By.XPATH, "//img[@data-src]"):
+                    src = img.get_attribute("data-src") or img.get_attribute("src")
+                    if is_valid_photo(src) and src not in fotos:
+                        fotos.append(src)
+                
+                # Estrategia 2: Buscar en tags picture o div con data-src
+                if not fotos or len(fotos) < 3:
+                    for picture in driver.find_elements(By.TAG_NAME, "picture"):
+                        try:
+                            img = picture.find_element(By.TAG_NAME, "img")
+                            src = img.get_attribute("src") or img.get_attribute("data-src")
+                            if is_valid_photo(src) and src not in fotos:
+                                fotos.append(src)
+                        except:
+                            pass
+                
+                # Estrategia 3: Ejecutar JavaScript para obtener todas las imágenes
+                try:
+                    js_fotos = driver.execute_script("""
+                        const excludeKeywords = ['logo', 'icon', 'placeholder', 'avatar', 'sprite', 'button',
+                                                 'header', 'footer', 'nav', 'menu', 'banner', 'badge',
+                                                 'mark', 'seal', 'watermark', 'instagram', 'facebook',
+                                                 'youtube', 'twitter', 'social', 'share', 'arrow'];
+                        return Array.from(document.querySelectorAll('img'))
+                            .map(img => img.src || img.getAttribute('data-src'))
+                            .filter(src => {
+                                if (!src || src.length < 40) return false;
+                                const lower = src.toLowerCase();
+                                if (excludeKeywords.some(kw => lower.includes(kw))) return false;
+                                return true;
+                            })
+                            .filter((src, idx, arr) => arr.indexOf(src) === idx);
+                    """)
+                    if js_fotos:
+                        for f in js_fotos:
+                            if f not in fotos:
+                                fotos.append(f)
+                except:
+                    pass
+                
+                # Remover duplicados manteniendo orden
+                fotos_unicas = []
+                for foto in fotos:
+                    if foto not in fotos_unicas:
+                        fotos_unicas.append(foto)
+                
+                detalles["fotos"] = fotos_unicas[:10]  # Máximo 10 fotos
+                if debug:
+                    logger.info(f"Fotos extraídas: {len(fotos_unicas)}")
+            except Exception as e:
+                if debug:
+                    logger.info(f"Error extrayendo fotos: {e}")
+        
+        except Exception as e:
+            logger.error(f"Error extrayendo detalles de {url}: {e}")
+        
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+        
+        return detalles
+    
+    @staticmethod
     def buscar_propiedades(zona: str = "Palermo", tipo: str = "venta", limit: int = 10, debug: bool = False, stop_flag=None) -> List[Dict]:
         """Scraping de BuscadorProp."""
         if debug:
@@ -369,7 +645,7 @@ class BuscadorPropScraper:
 
     @staticmethod
     def buscar_propiedades_selenium(zona: str = "Palermo", tipo: str = "venta", limit: int = 10, debug: bool = False, stop_flag=None) -> List[Dict]:
-        """Scraping de BuscadorProp - extrae h2 (tipo) + dirección (span/p)."""
+        """Scraping de BuscadorProp - extrae h2 (tipo) + dirección (span/p) + detalles + fotos."""
         try:
             from selenium import webdriver
             from selenium.webdriver.common.by import By
@@ -465,16 +741,34 @@ class BuscadorPropScraper:
                     if not desc or len(desc) < 10:
                         continue
                     
-                    # Precio
+                    # Precio inicial (de la tarjeta)
                     precio = "N/A"
                     for line in parent.text.split("\n"):
                         if "$" in line or "USD" in line.upper():
                             precio = line.strip()
                             break
                     
+                    # Extraer foto de la tarjeta (portada)
+                    foto_portada = None
+                    try:
+                        img = parent.find_element(By.TAG_NAME, "img")
+                        img_src = img.get_attribute("src") or img.get_attribute("data-src")
+                        # Filtrar iconos y logos (no cargar URLs con palabras clave sospechosas)
+                        if img_src and not any(keyword in img_src.lower() for keyword in ["icon", "logo", "star", "placeholder", "header", "footer", "nav", "button", "badge"]):
+                            foto_portada = img_src
+                    except:
+                        pass
+                    
+                    # NUEVO: Extraer detalles completos de la página individual
+                    detalles = BuscadorPropScraper.extraer_detalles_propiedad(href, debug=debug)
+                    
+                    # Usar precio completo si está disponible
+                    if detalles.get("precio_completo"):
+                        precio = detalles["precio_completo"]
+                    
                     out.append({
                         "id": href,
-                        "tipo": "Propiedad",
+                        "tipo": titulo or "Propiedad",
                         "zona": zona,
                         "precio": precio,
                         "descripcion": desc[:300],
@@ -482,15 +776,24 @@ class BuscadorPropScraper:
                         "fuente": "BuscadorProp",
                         "fecha_agregado": datetime.now().isoformat(),
                         "amenities": "",
-                        "habitaciones": None,
-                        "baños": None,
+                        "habitaciones": detalles.get("dormitorios") or detalles.get("ambientes"),
+                        "baños": detalles.get("baños"),
                         "pileta": None,
-                        "metros_cubiertos": None,
-                        "metros_descubiertos": None,
+                        "metros_cubiertos": detalles.get("superficie_cubierta"),
+                        "metros_descubiertos": detalles.get("superficie_total"),
                         "latitud": None,
                         "longitud": None,
+                        "foto_portada": foto_portada,
+                        "fotos": detalles.get("fotos", []),
+                        "antiguedad": detalles.get("antiguedad"),
+                        "estado": detalles.get("estado"),
+                        "direccion": detalles.get("direccion"),
                     })
-                except:
+                    
+                    time.sleep(random.uniform(1, 2))  # Delay entre propiedades
+                except Exception as e:
+                    if debug:
+                        logger.info(f"Error procesando link {idx}: {e}")
                     continue
             
             if debug:
@@ -510,13 +813,18 @@ class BuscadorPropScraper:
 
 
 class PropertyDatabase:
-    def __init__(self, db_path: str = "../data/properties.db"):
+    def __init__(self, db_path: str = "data/properties.db"):
         self.db_path = db_path
         self._init_db()
 
     def _init_db(self):
         """Inicializa la BD."""
         try:
+            # Asegurar que la carpeta data existe
+            db_dir = os.path.dirname(self.db_path)
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(db_dir, exist_ok=True)
+            
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute("""
@@ -541,9 +849,46 @@ class PropertyDatabase:
                     longitud REAL,
                     url TEXT,
                     fuente TEXT,
-                    fecha_agregado TEXT
+                    fecha_agregado TEXT,
+                    foto_portada TEXT,
+                    fotos TEXT,
+                    estado TEXT,
+                    direccion TEXT
                 )
             """)
+            
+            # Crear tabla de feedback
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    propiedad_id TEXT NOT NULL,
+                    tipo TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    UNIQUE(propiedad_id, tipo),
+                    FOREIGN KEY(propiedad_id) REFERENCES propiedades(id)
+                )
+            """)
+            conn.commit()
+            
+            # Agregar columnas nuevas si no existen (migración)
+            cursor.execute("PRAGMA table_info(propiedades)")
+            columns = {row[1] for row in cursor.fetchall()}
+            
+            nuevas_columnas = {
+                'foto_portada': 'TEXT',
+                'fotos': 'TEXT',
+                'estado': 'TEXT',
+                'direccion': 'TEXT'
+            }
+            
+            for col_name, col_type in nuevas_columnas.items():
+                if col_name not in columns:
+                    try:
+                        cursor.execute(f"ALTER TABLE propiedades ADD COLUMN {col_name} {col_type}")
+                        logger.info(f"Agregada columna {col_name} a la BD")
+                    except Exception as e:
+                        logger.warning(f"Columna {col_name} ya existe o error: {e}")
+            
             conn.commit()
             conn.close()
         except Exception as e:
@@ -587,12 +932,19 @@ class PropertyDatabase:
                         except:
                             pass
                     
+                    # Convertir fotos a JSON si es una lista
+                    fotos_json = ""
+                    if isinstance(prop.get("fotos"), list) and prop.get("fotos"):
+                        import json
+                        fotos_json = json.dumps(prop.get("fotos"))
+                    
                     cursor.execute("""
                         INSERT OR REPLACE INTO propiedades 
                         (id, tipo, zona, precio, precio_valor, precio_moneda,
                          habitaciones, baños, toilettes, pileta, metros_cubiertos, metros_descubiertos,
-                         orientacion, antiguedad, descripcion, amenities, latitud, longitud, url, fuente, fecha_agregado)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         orientacion, antiguedad, descripcion, amenities, latitud, longitud, url, fuente, fecha_agregado,
+                         foto_portada, fotos, estado, direccion)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         prop.get("id", str(datetime.now())),
                         prop.get("tipo", ""),
@@ -614,7 +966,11 @@ class PropertyDatabase:
                         prop.get("longitud"),
                         url,
                         prop.get("fuente", ""),
-                        prop.get("fecha_agregado", datetime.now().isoformat())
+                        prop.get("fecha_agregado", datetime.now().isoformat()),
+                        prop.get("foto_portada", ""),
+                        fotos_json,
+                        prop.get("estado", ""),
+                        prop.get("direccion", "")
                     ))
                     agregadas += 1
                 except Exception as e:
@@ -654,7 +1010,7 @@ class PropertyDatabase:
             logger.error(f"Error leyendo DF: {e}")
             return pd.DataFrame()
 
-    def guardar_csv(self, csv_path: str = "../data/properties_expanded.csv") -> None:
+    def guardar_csv(self, csv_path: str = "data/properties_expanded.csv") -> None:
         """Exporta a CSV."""
         try:
             df = self.obtener_df()
@@ -688,3 +1044,55 @@ class PropertyDatabase:
         except Exception as e:
             logger.error(f"Error en estadísticas: {e}")
             return {"total_propiedades": 0, "fuentes": [], "zonas": []}
+
+    def guardar_feedback(self, propiedad_id: str, tipo: str, timestamp: str = None) -> bool:
+        """Guarda feedback de una propiedad (positivo/negativo)."""
+        try:
+            if timestamp is None:
+                timestamp = datetime.now().isoformat()
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # INSERT OR IGNORE para evitar duplicados (constraint UNIQUE)
+            cursor.execute("""
+                INSERT OR IGNORE INTO feedback (propiedad_id, tipo, timestamp)
+                VALUES (?, ?, ?)
+            """, (propiedad_id, tipo, timestamp))
+            
+            conn.commit()
+            conn.close()
+            logger.info(f"Feedback guardado: {propiedad_id} - {tipo}")
+            return True
+        except Exception as e:
+            logger.error(f"Error guardando feedback: {e}")
+            return False
+
+    def obtener_feedback(self) -> List[Dict]:
+        """Obtiene todo el feedback guardado."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM feedback")
+            feedback = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return feedback
+        except Exception as e:
+            logger.error(f"Error obteniendo feedback: {e}")
+            return []
+
+    def obtener_feedback_por_tipo(self, tipo: str) -> List[Dict]:
+        """Obtiene feedback de un tipo específico (positivo/negativo)."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM feedback WHERE tipo = ?", (tipo,))
+            feedback = [dict(row) for row in cursor.fetchall()]
+            conn.close()
+            return feedback
+        except Exception as e:
+            logger.error(f"Error obteniendo feedback: {e}")
+            return []
+

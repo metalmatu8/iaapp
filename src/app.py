@@ -13,6 +13,91 @@ st.set_page_config(page_title="Agente RAG Inmobiliario", page_icon="🏠", layou
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# CSS Personalizado
+st.markdown("""
+<style>
+/* ===== BOTONES ===== */
+[data-testid="stButton"] button {
+    border: 1px solid rgba(49, 51, 63, 0.2) !important;
+    border-radius: 6px !important;
+    padding: 12px 20px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+}
+
+[data-testid="stButton"] {
+    width: 100% !important;
+}
+
+/* ===== COLUMNAS ===== */
+.stHorizontalBlock [data-testid="stColumn"] {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+/* ===== SELECTBOX ===== */
+[data-testid="stSelectbox"] {
+    width: 100% !important;
+}
+
+[data-testid="stSelectbox"] > div {
+    width: 100% !important;
+}
+
+/* ===== MULTISELECT ===== */
+[data-testid="stMultiSelect"] {
+    width: 100% !important;
+}
+
+[data-testid="stMultiSelect"] > div {
+    width: 100% !important;
+}
+
+/* ===== TEXT INPUT (BÚSQUEDA) ===== */
+[data-testid="stTextInput"] {
+    width: 100% !important;
+}
+
+[data-testid="stTextInput"] input {
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 10px 12px !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(49, 51, 63, 0.2) !important;
+    font-size: 14px !important;
+}
+
+/* ===== NUMBER INPUT ===== */
+[data-testid="stNumberInput"] {
+    width: 100% !important;
+}
+
+[data-testid="stNumberInput"] input {
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 10px 12px !important;
+    border-radius: 6px !important;
+    border: 1px solid rgba(49, 51, 63, 0.2) !important;
+}
+
+/* ===== RADIO ===== */
+[data-testid="stRadio"] {
+    width: 100% !important;
+}
+
+/* ===== MÉTRICAS ===== */
+[data-testid="stMetric"] {
+    background-color: rgba(240, 242, 246, 0.5) !important;
+    padding: 12px !important;
+    border-radius: 6px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # 1-4. Cargar y preparar datos, embeddings y vector store (cacheado)
 @st.cache_resource(show_spinner="Cargando base de datos de propiedades...")
 def cargar_sistema():
@@ -347,15 +432,14 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             municipios = geo_data.get("municipios_por_provincia", {}).get(provincia, [])
             localidades_list = ["Todas"] + [m["nombre"] for m in municipios]
         
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            localidades_seleccionadas = st.multiselect(
-                "Localidades a descargar",
-                localidades_list,
-                default=["Todas"] if "Todas" in localidades_list else localidades_list[:1]
-            )
-        with col2:
-            limite = st.number_input("Props/zona", 5, 100, 10)
+        localidad_seleccionada = st.selectbox(
+            "📍 Localidad",
+            localidades_list,
+            index=0
+        )
+        localidades_seleccionadas = [localidad_seleccionada]
+        
+        limite = st.number_input("📊 Cantidad", 5, 100, 10)
         
         # Si selecciona "Todas", descargar de todas
         if "Todas" in localidades_seleccionadas:
@@ -431,17 +515,17 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
         
         # Fallback: localidades hardcodeadas
         portal_fb = st.selectbox("Portal", ["Argenprop", "BuscadorProp"], key="portal_fallback")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            zonas_seleccionadas = st.multiselect(
-                "Zonas a descargar",
-                ["Palermo", "Recoleta", "San Isidro", "Belgrano", "Flores", 
-                 "Caballito", "La Boca", "San Telmo", "Villa Crespo", "Colegiales",
-                 "Lomas de Zamora", "Temperley", "La Matanza"],
-                default=["Palermo"]
-            )
-        with col2:
-            limite = st.number_input("Props/zona", 5, 100, 10, key="limite_fallback")
+        zona_seleccionada = st.selectbox(
+            "📍 Zona",
+            ["Palermo", "Recoleta", "San Isidro", "Belgrano", "Flores", 
+             "Caballito", "La Boca", "San Telmo", "Villa Crespo", "Colegiales",
+             "Lomas de Zamora", "Temperley", "La Matanza"],
+            index=0,
+            key="zona_fallback"
+        )
+        zonas_seleccionadas = [zona_seleccionada]
+        
+        limite = st.number_input("📊 Cantidad", 5, 100, 10, key="limite_fallback")
         
         tipo_prop = st.radio("Tipo", ["Venta", "Alquiler"], horizontal=True, key="tipo_fallback")
         

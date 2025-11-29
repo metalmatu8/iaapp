@@ -25,4 +25,4 @@ REM Ejecutar la app
 echo.
 echo ✅ Iniciando Streamlit...
 echo.
-streamlit run src/app.py
+streamlit run app.py
