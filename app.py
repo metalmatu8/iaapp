@@ -12,6 +12,21 @@ import shutil
 # Detectar si estamos en Streamlit Cloud
 IS_STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SERVER_HEADLESS') == 'true' or os.path.exists('/home/appuser')
 
+# Si estamos en cloud, ejecutar fix_chromedriver una sola vez para instalar ChromeDriver correcto
+if IS_STREAMLIT_CLOUD:
+    try:
+        import subprocess
+        import sys
+        # Ejecutar fix_chromedriver.py para detectar versión de Chromium e instalar ChromeDriver compatible
+        result = subprocess.run([sys.executable, "fix_chromedriver.py"], 
+                              capture_output=True, text=True, timeout=60)
+        if result.returncode == 0:
+            print("✅ ChromeDriver configurado correctamente")
+        else:
+            print(f"⚠️ Warning en fix_chromedriver: {result.stderr}")
+    except Exception as e:
+        print(f"⚠️ No se pudo ejecutar fix_chromedriver.py: {e}")
+
 # Configuración
 st.set_page_config(
     page_title="Agente RAG Inmobiliario", 
