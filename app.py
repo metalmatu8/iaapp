@@ -99,34 +99,145 @@ st.markdown("""
         transform: translateY(-2px) !important;
     }
     
-    /* Buttons */
-    .stButton > button {
+    /* Buttons - Simple y directo */
+    /* ESTILOS ÚNICOS Y CONSISTENTES PARA TODOS LOS BOTONES */
+    .stButton {
+        width: 100% !important;
+    }
+    
+    .stButton > button,
+    [data-testid="stButton"] button {
+        width: 100% !important;
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
         border-radius: 8px !important;
         border: none !important;
         font-weight: 600 !important;
-        padding: 0.75rem 1.5rem !important;
+        padding: 0 1.5rem !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25) !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        color: white !important;
+        font-size: 15px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        line-height: 1 !important;
     }
     
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
+    .stButton > button:hover:not(:disabled),
+    [data-testid="stButton"] button:hover:not(:disabled) {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35) !important;
     }
     
-    /* Input fields */
+    .stButton > button:active:not(:disabled),
+    [data-testid="stButton"] button:active:not(:disabled) {
+        transform: translateY(-1px) !important;
+    }
+    
+    .stButton > button:disabled,
+    [data-testid="stButton"] button:disabled {
+        background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%) !important;
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+    }
+    
+    /* Container de botones - alineación vertical */
+    [data-testid="stButton"] {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    /* Botones en la TERCERA COLUMNA (derecha) con altura doble */
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) [data-testid="stButton"] button {
+        height: 88px !important;
+        min-height: 88px !important;
+        max-height: 88px !important;
+    }
+    
+    /* Botón "Detener Descarga" (stop_scraper) con altura doble */
+    [data-testid="stButton"] button[data-testid*="stop_scraper"],
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) [data-testid="stButton"] button {
+        height: 88px !important;
+        min-height: 88px !important;
+        max-height: 88px !important;
+    }
+    
+
+    /* Input fields - Improved for search bar */
     input, textarea, [data-testid="stTextInput"], [data-testid="stTextArea"] {
-        border-radius: 8px !important;
-        border: 1.5px solid !important;
-        padding: 0.75rem 1rem !important;
+        border-radius: 10px !important;
+        border: 2px solid rgba(200, 200, 200, 0.4) !important;
+        padding: 0.95rem 1.2rem !important;
         transition: all 0.3s ease !important;
+        background: #ffffff !important;
+        font-size: 16px !important;
+        line-height: 1.5 !important;
+    }
+    
+    input::placeholder, textarea::placeholder {
+        color: rgba(107, 114, 128, 0.6) !important;
+        font-weight: 400 !important;
+    }
+    
+    input:hover, textarea:hover {
+        border-color: rgba(59, 130, 246, 0.4) !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
     }
     
     input:focus, textarea:focus {
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        border-color: rgba(59, 130, 246, 0.8) !important;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), inset 0 0 0 1px rgba(59, 130, 246, 0.3) !important;
+        outline: none !important;
     }
     
-    /* Expanders - contorno uniforme y consistente */
+    [data-testid="stTextInput"] input {
+        border-color: rgba(200, 200, 200, 0.5) !important;
+    }
+    
+    [data-testid="stTextInput"] input:hover {
+        border-color: rgba(59, 130, 246, 0.5) !important;
+    }
+    
+    /* Estilos especiales para columnas de búsqueda */
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        gap: 1rem !important;
+    }
+    
+
+    /* Mejora visual de dividers */
+    hr {
+        border: none !important;
+        border-top: 2px solid rgba(200, 200, 200, 0.2) !important;
+        margin: 2rem 0 !important;
+    }
+    
+    /* Success/Info/Warning messages */
+    [data-testid="stSuccess"], [data-testid="stInfo"], [data-testid="stWarning"] {
+        border-radius: 10px !important;
+        border-left: 4px solid !important;
+        padding: 1rem !important;
+        background: rgba(240, 253, 250, 0.5) !important;
+    }
+    
+    [data-testid="stSuccess"] {
+        border-left-color: #10b981 !important;
+        background: rgba(240, 253, 250, 0.7) !important;
+    }
+    
+    [data-testid="stInfo"] {
+        border-left-color: #3b82f6 !important;
+        background: rgba(239, 246, 255, 0.7) !important;
+    }
+    
+    [data-testid="stWarning"] {
+        border-left-color: #f59e0b !important;
+        background: rgba(255, 250, 235, 0.7) !important;
+    }
     [data-testid="stExpander"] {
         border: 1.5px solid rgba(200, 200, 200, 0.3) !important;
         border-radius: 8px !important;
@@ -202,34 +313,7 @@ st.markdown("""
         font-size: 15px !important;
     }
     
-    /* Botones simétricos y con mismo tamaño */
-    [data-testid="stButton"] button {
-        width: 100% !important;
-        min-height: 50px !important;
-        font-size: 15px !important;
-        font-weight: 600 !important;
-        padding: 0px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        border-radius: 8px !important;
-        transition: all 0.3s ease !important;
-        line-height: 1.4 !important;
-        height: 50px !important;
-    }
-    
-    [data-testid="stButton"] button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-    }
-    
-    /* ELIMINAR regla que fuerza columnas 50/50 - permitir proporciones personalizadas */
-    /* Las columnas ahora respetarán las proporciones definidas en st.columns() */
-    
-    /* Elemento container del button */
-    [data-testid="stButton"] {
-        width: 100% !important;
-    }
+    /* Reglas de botones consolidadas arriba - evitar duplicados */
     
     /* Tabs */
     [data-testid="stTabs"] [role="tab"] {
@@ -368,9 +452,15 @@ def cargar_sistema():
     # Intentar obtener la colección existente
     try:
         collection = chroma_client.get_collection("propiedades")
-        logger.info(f"Colección existente encontrada con {collection.count()} documentos")
-        if collection.count() > 0:
+        docs_existentes = collection.count()
+        logger.info(f"Colección existente encontrada con {docs_existentes} documentos")
+        
+        # IMPORTANTE: Si tiene menos documentos que la BD actual, regenerar
+        # Esto evita cachés obsoletos o incompletos
+        if docs_existentes >= len(df) * 0.8:  # Si tiene al menos 80% de las propiedades, usar
             return model, collection, df
+        else:
+            logger.warning(f"Colección incompleta ({docs_existentes}/{len(df)} docs). Regenerando...")
     except:
         pass
     
@@ -426,14 +516,17 @@ bd_vacia = df_propiedades.empty
 
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
-    """Búsqueda RAG semántica."""
+    """Búsqueda RAG semántica mejorada con procesamiento inteligente sin API."""
     # Si la BD está vacía, no hay nada que buscar
     if bd_vacia:
         return [], "Base de datos vacía. Descarga propiedades primero desde 'Descargar de Internet'"
     
+    # Procesar la query para entender mejor la intención
+    search_query = mejorar_query(query)
+    
     # Búsqueda semántica (pedir más para paginación)
-    k_expanded = min(max(k, 10), len(df_propiedades))  # Mínimo 10 para paginación
-    query_emb = model.encode([query])
+    k_expanded = min(max(k, 50), len(df_propiedades))  # Mínimo 50 para mejor cobertura de zonas
+    query_emb = model.encode([search_query])
     results = collection.query(query_embeddings=query_emb.tolist(), n_results=k_expanded)
     
     # Retornar registros completos de BD
@@ -445,9 +538,235 @@ def buscar_propiedades(query, k=5):
             propiedades_recomendadas.append(prop_row.to_dict())
     
     if not propiedades_recomendadas:
-        return [], "No hay propiedades que combinen con tu búsqueda."
+        return [], "No hay propiedades que combinen con tu búsqueda. Intenta con otros criterios."
     
     return propiedades_recomendadas, None
+
+def mejorar_query(query):
+    """Mejora la query usando procesamiento inteligente sin API."""
+    if not query:
+        return query
+    
+    query_lower = query.lower()
+    
+    # Diccionario de expansiones semánticas para criterios comunes
+    expansiones = {
+        'moderno': ['nuevo', 'renovado', 'contemporáneo', 'actualizado'],
+        'luminoso': ['luz', 'iluminado', 'ventanas'],
+        'amplio': ['espacioso', 'grande', 'tamaño', 'metros'],
+        'tranquilo': ['paz', 'quieto', 'residencial', 'alejado'],
+        'céntrico': ['centro', 'central', 'ubicación', 'acceso'],
+        'familia': ['habitaciones', 'dormitorios', 'niños', 'personas'],
+        'campo': ['rural', 'chacra', 'terreno', 'naturales'],
+        'ciudad': ['urbano', 'zona', 'barrio', 'localidad'],
+        'pequeño': ['compacto', 'estudio', 'monoambiente', 'reducido'],
+        'balcón': ['terraza', 'vista', 'aire libre'],
+        'jardin': ['patio', 'verde', 'exterior', 'plantas'],
+        'piscina': ['pileta', 'natatorio', 'agua'],
+        'seguridad': ['vigilancia', 'alarma', 'portero', 'cerradura'],
+        'cocina': ['cocina equipada', 'amoblada', 'electrodomésticos'],
+        'baño': ['baños', 'toilette', 'espacio sanitario'],
+        'parking': ['cochera', 'garaje', 'estacionamiento', 'auto'],
+    }
+    
+    # Expandir query con sinónimos relevantes
+    query_expandida = query
+    for palabra_clave, sinonimos in expansiones.items():
+        if palabra_clave in query_lower:
+            # Agregar sinónimos para mejor búsqueda semántica
+            query_expandida += " " + " ".join(sinonimos)
+    
+    # Detectar intenciones específicas y agregar contexto
+    intenciones = {
+        'número en familia': ['personas', 'miembros', 'tamaño familia'],
+        'presupuesto': ['máximo', 'mínimo', 'precio', 'renta', 'valor'],
+        'superficie': ['m2', 'metros', 'tamaño', 'superficie'],
+        'época': ['ahora', 'pronto', 'urgente', 'inmediato'],
+        'característica especial': ['con', 'tiene', 'debe', 'necesita'],
+    }
+    
+    # Agregar palabras de contexto según lo que detectemos
+    if any(x in query_lower for x in ['cuántas', 'cuantas', 'cantidad', 'número', 'personas']):
+        query_expandida += " tamaño distribución espacial dormitorios"
+    
+    if any(x in query_lower for x in ['cuánto', 'cuanto', 'precio', 'costo', 'valor']):
+        query_expandida += " precio valor inversión"
+    
+    if any(x in query_lower for x in ['dónde', 'donde', 'zona', 'ubicación', 'barrio']):
+        query_expandida += " localidad ubicación zona área"
+    
+    return query_expandida
+
+def reranquear_propiedades_localmente(query, propiedades):
+    """
+    Re-rankea propiedades con búsqueda INTELIGENTE y FLEXIBLE.
+    Usa coincidencias exactas pero NO descarta si no encuentra.
+    Sistema de puntuación que prioriza lo que el usuario buscó.
+    """
+    if not propiedades:
+        return []
+    
+    import re
+    query_lower = query.lower()
+    
+    # DICCIONARIO DE AMENITIES - Mapear palabras clave a campos reales
+    amenities_mapping = {
+        'pileta': ['pileta', 'piscina', 'natatorio'],
+        'piscina': ['pileta', 'piscina', 'natatorio'],
+        'jardín': ['jardín', 'patio', 'parque', 'verde'],
+        'patio': ['jardín', 'patio', 'parque'],
+        'aire': ['aire', 'clima', 'acondicionado'],
+        'gas': ['gas', 'calefacción'],
+        'garage': ['garage', 'cochera', 'estacionamiento', 'parking', 'auto'],
+        'cochera': ['garage', 'cochera', 'estacionamiento', 'parking'],
+        'terraza': ['terraza', 'balcón', 'vista'],
+        'balcón': ['terraza', 'balcón', 'vista'],
+        'cocina': ['cocina'],
+        'nuevo': ['nuevo', 'renovado', 'moderno', 'recién'],
+        'renovado': ['renovado', 'nuevo', 'moderno'],
+        'moderno': ['moderno', 'nuevo', 'renovado', 'contemporáneo'],
+        'seguridad': ['seguridad', 'vigilancia', 'alarma', 'portero'],
+        'luminoso': ['luz', 'iluminado', 'ventanas'],
+        'amplio': ['amplio', 'espacioso', 'grande'],
+    }
+    
+    # DICCIONARIO DE ZONAS
+    zonas_mapping = {
+        'san isidro': ['san isidro', 'isidro'],
+        'palermo': ['palermo', 'soho', 'hollywood', 'chico'],
+        'recoleta': ['recoleta'],
+        'belgrano': ['belgrano'],
+        'caballito': ['caballito', 'primera junta'],
+        'flores': ['flores', 'parque chacabuco'],
+        'puerto madero': ['puerto madero', 'madero'],
+        'la boca': ['la boca', 'boca'],
+        'san nicolás': ['san nicolás', 'nicolás'],
+        'centro': ['centro', 'retiro', 'microcentro'],
+        'caba': ['caba', 'buenos aires'],
+    }
+    
+    # EXTRAER LO QUE EL USUARIO BUSCA
+    criterios_buscados = {
+        'amenities': [],
+        'zona': None,
+        'tipo': None,
+        'habitaciones': None,
+        'precio_aprox': None,
+    }
+    
+    # 1. Detectar amenities buscados
+    for amenity, keywords in amenities_mapping.items():
+        for kw in keywords:
+            if kw in query_lower:
+                if amenity not in criterios_buscados['amenities']:
+                    criterios_buscados['amenities'].append(amenity)
+                break
+    
+    # 2. Detectar zona buscada
+    for zona_key, zona_keywords in zonas_mapping.items():
+        for kw in zona_keywords:
+            if kw in query_lower:
+                criterios_buscados['zona'] = zona_key
+                break
+        if criterios_buscados['zona']:
+            break
+    
+    # 3. Detectar tipo
+    tipos_search = ['casa', 'departamento', 'dpto', 'apt', 'apartamento', 'piso', 'loft', 'estudio', 'monoambiente']
+    for tipo in tipos_search:
+        if tipo in query_lower:
+            criterios_buscados['tipo'] = tipo
+            break
+    
+    # 4. Detectar número de habitaciones
+    numeros_query = re.findall(r'\d+', query)
+    for num_str in numeros_query:
+        num = int(num_str)
+        if 2 <= num <= 8:  # Probablemente habitaciones
+            criterios_buscados['habitaciones'] = num
+            break
+        elif num > 100000:  # Probablemente precio
+            criterios_buscados['precio_aprox'] = num
+            break
+    
+    # SCORING: Dar puntos según coincidencias, SIN descartar nada
+    scores = []
+    
+    for prop in propiedades:
+        score = 0
+        desc = str(prop.get('descripcion', '')).lower()
+        amenities = str(prop.get('amenities', '')).lower()
+        zona_prop = str(prop.get('zona', '')).lower()
+        tipo_prop = str(prop.get('tipo', '')).lower()
+        hab_prop = prop.get('habitaciones', '')
+        
+        # ZONA: Máxima prioridad si se especificó
+        if criterios_buscados['zona']:
+            zona_key = criterios_buscados['zona']
+            zona_keywords = zonas_mapping[zona_key]
+            zona_match = any(kw in zona_prop for kw in zona_keywords)
+            if zona_match:
+                score += 500  # Coincidencia exacta de zona = PRIORIDAD MÁXIMA
+            else:
+                # Penalidad leve si buscó zona específica pero no coincide
+                score -= 50
+        
+        # AMENITIES: Puntos por cada uno encontrado
+        for amenity in criterios_buscados['amenities']:
+            keywords = amenities_mapping.get(amenity, [])
+            amenity_found = False
+            
+            # Verificar en campo específico si existe (ej: pileta)
+            if amenity == 'pileta':
+                if prop.get('pileta') or any(kw in amenities for kw in keywords):
+                    score += 100
+                    amenity_found = True
+            else:
+                # Verificar en amenities o descripción
+                if any(kw in amenities for kw in keywords) or any(kw in desc for kw in keywords):
+                    score += 80
+                    amenity_found = True
+            
+            if not amenity_found:
+                # Penalidad menor si buscó algo específico pero no está
+                score -= 20
+        
+        # TIPO: Bonificación si coincide
+        if criterios_buscados['tipo']:
+            if criterios_buscados['tipo'] in tipo_prop:
+                score += 150
+            else:
+                score -= 30
+        
+        # HABITACIONES: Exacta es mejor, pero acepta >= buscado
+        if criterios_buscados['habitaciones']:
+            try:
+                hab_int = int(hab_prop) if hab_prop else 0
+                if hab_int == criterios_buscados['habitaciones']:
+                    score += 200  # Coincidencia exacta
+                elif hab_int >= criterios_buscados['habitaciones']:
+                    score += 100  # Tiene al menos las buscadas
+                else:
+                    score -= 40   # Tiene menos que lo buscado
+            except:
+                pass
+        
+        # BONIFICACIÓN GENERAL: Palabras del query en descripción
+        keywords_query = [kw.strip() for kw in query_lower.split() if len(kw.strip()) > 2]
+        for kw in keywords_query:
+            if kw not in ['san', 'isidro', 'palermo', 'recoleta']:  # Evitar duplicar zona
+                if kw in desc:
+                    score += 10
+                if kw in amenities:
+                    score += 8
+        
+        scores.append((prop, score))
+    
+    # Ordenar por score descendente
+    propiedades_ranked = sorted(scores, key=lambda x: x[1], reverse=True)
+    
+    # Retornar todas pero ordenadas por relevancia
+    return [prop for prop, score in propiedades_ranked]
 
 def extraer_palabras_clave(texto):
     """Extrae palabras clave de un texto."""
@@ -1230,7 +1549,7 @@ if "last_input_time" not in st.session_state:
 # Opción para ver todas las propiedades
 col_all, col_search = st.columns([0.1, 1])
 with col_all:
-    if st.button("📋 Ver Todas", key="btn_all_props", use_container_width=True):
+    if st.button("📋 Ver Todas", key="btn_all_props", width='stretch'):
         # Cargar todas las propiedades desde la BD
         from src.scrapers import PropertyDatabase
         db = PropertyDatabase()
@@ -1240,6 +1559,7 @@ with col_all:
             st.session_state.search_results = props_all
             st.session_state.search_query = "TODAS"
             st.session_state.search_page = 0
+            st.rerun()  # Actualizar pantalla inmediatamente
         else:
             st.warning("No hay propiedades en la BD")
 
@@ -1268,12 +1588,16 @@ if perfil and st.session_state.search_query != "TODAS":
         # Buscar propiedades
         propiedades, error = buscar_propiedades(
             perfil,
-            k=5
+            k=50  # Buscar 50 resultados iniciales para mejor ranking
         )
-        if not error:
-            st.session_state.search_results = propiedades
-        else:
+        
+        if not error and propiedades:
+            # Re-rankear resultados con scoring inteligente local
+            propiedades_ranked = reranquear_propiedades_localmente(perfil, propiedades)
+            st.session_state.search_results = propiedades_ranked
+        elif error:
             st.session_state.search_results = []
+            
     elif elapsed < 2.0 and perfil != st.session_state.search_query:
         # Mostrar placeholder mientras espera
         with st.spinner("⏳ Esperando para buscar..."):
@@ -1289,15 +1613,21 @@ if st.session_state.search_results:
     props_per_page = 5
     total_pages = (len(st.session_state.search_results) + props_per_page - 1) // props_per_page
     
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col1:
-        if st.button("⬅️ Anterior", disabled=st.session_state.search_page == 0):
+    st.markdown("---")
+    
+    # Usar columnas iguales de 1:1:1
+    pag_col1, pag_col2, pag_col3 = st.columns([1, 1, 1], gap="small")
+    
+    with pag_col1:
+        if st.button("⬅️ Anterior", disabled=st.session_state.search_page == 0, width='stretch', key="btn_prev_page"):
             st.session_state.search_page -= 1
             st.rerun()
-    with col2:
-        st.write(f"📄 Página {st.session_state.search_page + 1} de {total_pages} ({len(st.session_state.search_results)} resultados)")
-    with col3:
-        if st.button("Siguiente ➡️", disabled=st.session_state.search_page >= total_pages - 1):
+    
+    with pag_col2:
+        st.markdown(f"<div style='display: flex; justify-content: center; align-items: center; height: 48px;'><p style='text-align: center; margin: 0; font-size: 14px;'><b>Página {st.session_state.search_page + 1}/{total_pages}</b><br>({len(st.session_state.search_results)} resultados)</p></div>", unsafe_allow_html=True)
+    
+    with pag_col3:
+        if st.button("Siguiente ➡️", disabled=st.session_state.search_page >= total_pages - 1, width='stretch', key="btn_next_page"):
             st.session_state.search_page += 1
             st.rerun()
     
@@ -1370,7 +1700,7 @@ if st.session_state.search_results:
                         'latitude': [coords['lat']],
                         'longitude': [coords['lng']]
                     }
-                    st.map(map_data, zoom=15, use_container_width=True, height=300)
+                    st.map(map_data, zoom=15, width='stretch', height=300)
             
             # GALERÍA DE FOTOS EN LA PARTE INFERIOR - ANCHO COMPLETO
             if prop.get('fotos'):
@@ -1399,7 +1729,7 @@ if st.session_state.search_results:
                             st.session_state[gallery_key] = 0
                         
                         # Mostrar foto sin espacios
-                        st.image(fotos_validas[current_photo_idx], use_container_width=True)
+                        st.image(fotos_validas[current_photo_idx], width='stretch')
                         
                         # Contador centrado
                         st.caption(f"📷 {current_photo_idx + 1}/{len(fotos_validas)}", unsafe_allow_html=False)
@@ -1407,11 +1737,11 @@ if st.session_state.search_results:
                         # Botones de navegación centrados
                         nav_cols = st.columns([0.3, 0.1, 0.1, 0.3])
                         with nav_cols[1]:
-                            if st.button("⬅️", key=f"prev_{prop['id']}", use_container_width=True):
+                            if st.button("⬅️", key=f"prev_{prop['id']}", width='stretch'):
                                 st.session_state[gallery_key] = (current_photo_idx - 1) % len(fotos_validas)
                                 st.rerun()
                         with nav_cols[2]:
-                            if st.button("➡️", key=f"next_{prop['id']}", use_container_width=True):
+                            if st.button("➡️", key=f"next_{prop['id']}", width='stretch'):
                                 st.session_state[gallery_key] = (current_photo_idx + 1) % len(fotos_validas)
                                 st.rerun()
                 except Exception as e:
@@ -1422,7 +1752,7 @@ if st.session_state.search_results:
                     foto_portada = prop['foto_portada']
                     if foto_portada and es_imagen_propiedad_valida(foto_portada):
                         st.markdown("### 📸 Foto")
-                        st.image(foto_portada, use_container_width=True)
+                        st.image(foto_portada, width='stretch')
                 except:
                     pass
             
@@ -1439,9 +1769,9 @@ if st.session_state.search_results:
             col_like, col_dislike = st.columns([1, 1])
             with col_like:
                 if ya_marcada:
-                    st.button("✅ Ya marcada" if ya_marcada_positivo else "✅ Ya tiene feedback", disabled=True, use_container_width=True, key=f"like_disabled_{prop['id']}")
+                    st.button("✅ Ya marcada" if ya_marcada_positivo else "✅ Ya tiene feedback", disabled=True, width='stretch', key=f"like_disabled_{prop['id']}")
                 else:
-                    if st.button("👍 Me interesa", key=f"like_{prop['id']}", use_container_width=True):
+                    if st.button("👍 Me interesa", key=f"like_{prop['id']}", width='stretch'):
                         timestamp = datetime.now().strftime("%H:%M:%S")
                         st.session_state.chat_history.append({
                             "rol": "feedback",
@@ -1457,9 +1787,9 @@ if st.session_state.search_results:
                         st.rerun()
             with col_dislike:
                 if ya_marcada:
-                    st.button("✅ Ya marcada" if ya_marcada_negativo else "✅ Ya tiene feedback", disabled=True, use_container_width=True, key=f"dislike_disabled_{prop['id']}")
+                    st.button("✅ Ya marcada" if ya_marcada_negativo else "✅ Ya tiene feedback", disabled=True, width='stretch', key=f"dislike_disabled_{prop['id']}")
                 else:
-                    if st.button("👎 No es para mí", key=f"dislike_{prop['id']}", use_container_width=True):
+                    if st.button("👎 No es para mí", key=f"dislike_{prop['id']}", width='stretch'):
                         timestamp = datetime.now().strftime("%H:%M:%S")
                         st.session_state.chat_history.append({
                             "rol": "feedback",
