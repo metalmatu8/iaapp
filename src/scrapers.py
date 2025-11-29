@@ -401,8 +401,15 @@ class BuscadorPropScraper:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-            except:
-                driver = webdriver.Chrome(options=opts)
+            except Exception as driver_init_error:
+                # Si falla la inicialización del driver, es probable que sea por dependencias del sistema
+                error_msg = str(driver_init_error)
+                if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                    logger.debug(f"BuscadorProp: Chromedriver no disponible, devolviendo detalles vacíos")
+                    return detalles
+                else:
+                    logger.debug(f"BuscadorProp: Error inicializando driver para {url}, devolviendo detalles vacíos")
+                    return detalles
             
             driver.get(url)
             time.sleep(3)
@@ -624,7 +631,11 @@ class BuscadorPropScraper:
                     logger.info(f"Error extrayendo fotos: {e}")
         
         except Exception as e:
-            logger.error(f"Error extrayendo detalles de {url}: {e}")
+            error_msg = str(e)
+            if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                logger.debug(f"BuscadorProp: Chromedriver no disponible para extraer detalles de {url}")
+            else:
+                logger.debug(f"Error extrayendo detalles de {url}: {type(e).__name__}: {e}")
         
         finally:
             if driver:
@@ -678,8 +689,16 @@ class BuscadorPropScraper:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-            except:
-                driver = webdriver.Chrome(options=opts)
+            except Exception as driver_init_error:
+                # Si falla la inicialización del driver, es probable que sea por dependencias del sistema
+                error_msg = str(driver_init_error)
+                if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                    logger.error(f"BuscadorProp error: Chromedriver no disponible en este entorno (falta Chromium). {error_msg}")
+                    logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona} - entorno sin soporte para Selenium")
+                    return []
+                else:
+                    logger.error(f"BuscadorProp error al inicializar driver: {driver_init_error}")
+                    return []
             
             if debug:
                 logger.info(f"BuscadorProp: {base_url}")
@@ -800,7 +819,12 @@ class BuscadorPropScraper:
                 logger.info(f"Extraídas {len(out)} propiedades")
         
         except Exception as e:
-            logger.error(f"BuscadorProp error: {e}")
+            error_msg = str(e)
+            if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                logger.error(f"BuscadorProp error: Chromedriver fallo (code 127 - dependencias del sistema): {e}")
+                logger.warning(f"BuscadorProp: No se puede descargar propiedades - entorno sin soporte para Selenium")
+            else:
+                logger.error(f"BuscadorProp error: {e}")
         
         finally:
             if driver:
