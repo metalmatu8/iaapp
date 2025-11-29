@@ -8,6 +8,9 @@ import logging
 import time
 import threading
 
+# Detectar si estamos en Streamlit Cloud
+IS_STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SERVER_HEADLESS') == 'true' or os.path.exists('/home/appuser')
+
 # Configuración
 st.set_page_config(page_title="Agente RAG Inmobiliario", page_icon="🏠", layout="wide")
 logging.basicConfig(level=logging.INFO)
@@ -146,7 +149,12 @@ def cargar_sistema():
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode(df['text'].tolist())
     
-    chroma_client = chromadb.PersistentClient(path="../data/chroma_data")
+    # Usar cliente en memoria en Streamlit Cloud, persistente en local
+    if IS_STREAMLIT_CLOUD:
+        logger.info("Detectado Streamlit Cloud - usando ChromaDB en memoria")
+        chroma_client = chromadb.EphemeralClient()
+    else:
+        chroma_client = chromadb.PersistentClient(path="../data/chroma_data")
     
     # Intentar obtener la colección existente
     try:
@@ -503,10 +511,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                st.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga portal: {ie}")
+                st.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                logger.error(f"Error general en descarga portal: {type(e).__name__}: {str(e)}", exc_info=True)
+                st.error(f"Error: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
     
     except Exception as e:
@@ -583,10 +593,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                st.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga fallback: {ie}")
+                st.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                logger.error(f"Error general en descarga fallback: {type(e).__name__}: {str(e)}", exc_info=True)
+                st.error(f"Error: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
 
 # Sección de tareas programadas

@@ -114,14 +114,23 @@ class ArgenpropScraper:
             opts.add_argument("--disable-dev-shm-usage")
             opts.add_argument("--disable-gpu")
             opts.add_argument("--window-size=1920,1080")
+            opts.add_argument("--disable-blink-features=AutomationControlled")  # Evitar detección de version en Chrome
             opts.add_argument("user-agent=" + random.choice(USER_AGENTS))
             
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-            except:
-                driver = webdriver.Chrome(options=opts)
+                # Usar ChromeDriverManager - detecta versión automáticamente
+                driver_path = ChromeDriverManager().install()
+                logger.debug(f"ChromeDriver instalado en: {driver_path}")
+                driver = webdriver.Chrome(service=Service(driver_path), options=opts)
+            except Exception as wdm_error:
+                logger.debug(f"webdriver_manager error: {wdm_error}. Intentando sin manager...")
+                try:
+                    driver = webdriver.Chrome(options=opts)
+                except Exception as direct_error:
+                    logger.error(f"No se puede inicializar Chrome: {direct_error}")
+                    return []
             
             if debug:
                 logger.info(f"Argenprop: {url}")
@@ -393,16 +402,60 @@ class BuscadorPropScraper:
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-gpu")
         opts.add_argument("--window-size=1920,1080")
+        opts.add_argument("--disable-blink-features=AutomationControlled")  # Evitar detección de version en Chrome
         opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+        
+        # Detectar si Chromium está instalado en el sistema (Streamlit Cloud)
+        chromium_paths = [
+            "/usr/bin/chromium-browser",  # Streamlit Cloud
+            "/usr/bin/chromium",
+            "/snap/bin/chromium",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "C:\\Program Files\\Chromium\\Application\\chrome.exe",  # Windows
+        ]
+        chromium_binary = None
+        for path in chromium_paths:
+            if os.path.exists(path):
+                chromium_binary = path
+                logger.debug(f"Detectado Chromium en: {chromium_binary}")
+                break
+        
+        if chromium_binary:
+            opts.binary_location = chromium_binary
         
         driver = None
         try:
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-            except:
-                driver = webdriver.Chrome(options=opts)
+                driver_path = ChromeDriverManager().install()
+                logger.debug(f"ChromeDriver instalado en: {driver_path}")
+                driver = webdriver.Chrome(service=Service(driver_path), options=opts)
+            except ModuleNotFoundError as module_error:
+                # webdriver_manager no está instalado
+                if "webdriver_manager" in str(module_error):
+                    logger.debug(f"BuscadorProp: webdriver_manager no disponible, intentando sin manager...")
+                    driver = webdriver.Chrome(options=opts)
+                else:
+                    logger.debug(f"BuscadorProp: Error de módulo para {url}, devolviendo detalles vacíos")
+                    return detalles
+            except Exception as driver_init_error:
+                # Si falla la inicialización del driver, es probable que sea por dependencias del sistema
+                error_msg = str(driver_init_error)
+                if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                    logger.debug(f"BuscadorProp: Chromedriver no disponible, devolviendo detalles vacíos")
+                    return detalles
+                elif "session not created" in error_msg.lower() or "version" in error_msg.lower():
+                    # ChromeDriver version mismatch - intentar sin manager
+                    logger.debug(f"BuscadorProp: Version mismatch, intentando sin webdriver_manager...")
+                    try:
+                        driver = webdriver.Chrome(options=opts)
+                    except Exception as fallback_error:
+                        logger.debug(f"BuscadorProp: Fallback también falló, devolviendo detalles vacíos")
+                        return detalles
+                else:
+                    logger.debug(f"BuscadorProp: Error inicializando driver para {url}, devolviendo detalles vacíos")
+                    return detalles
             
             driver.get(url)
             time.sleep(3)
@@ -624,7 +677,11 @@ class BuscadorPropScraper:
                     logger.info(f"Error extrayendo fotos: {e}")
         
         except Exception as e:
-            logger.error(f"Error extrayendo detalles de {url}: {e}")
+            error_msg = str(e)
+            if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                logger.debug(f"BuscadorProp: Chromedriver no disponible para extraer detalles de {url}")
+            else:
+                logger.debug(f"Error extrayendo detalles de {url}: {type(e).__name__}: {e}")
         
         finally:
             if driver:
@@ -669,18 +726,82 @@ class BuscadorPropScraper:
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-gpu")
         opts.add_argument("--window-size=1920,1080")
+        opts.add_argument("--disable-blink-features=AutomationControlled")  # Evitar detección de version en Chrome
         opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+        
+        # Detectar si Chromium está instalado en el sistema (Streamlit Cloud)
+        chromium_paths = [
+            "/usr/bin/chromium-browser",  # Streamlit Cloud
+            "/usr/bin/chromium",
+            "/snap/bin/chromium",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "C:\\Program Files\\Chromium\\Application\\chrome.exe",  # Windows
+        ]
+        chromium_binary = None
+        for path in chromium_paths:
+            if os.path.exists(path):
+                chromium_binary = path
+                logger.debug(f"Detectado Chromium en: {chromium_binary}")
+                break
+        
+        if chromium_binary:
+            opts.binary_location = chromium_binary
         
         out: List[Dict] = []
         driver = None
+        
+        # Detectar si Chromium está instalado en el sistema (Streamlit Cloud)
+        chromium_paths = [
+            "/usr/bin/chromium-browser",  # Streamlit Cloud (antiguo)
+            "/usr/bin/chromium",          # Streamlit Cloud (actual)
+            "/snap/bin/chromium",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "C:\\Program Files\\Chromium\\Application\\chrome.exe",  # Windows
+        ]
+        chromium_binary = None
+        for path in chromium_paths:
+            if os.path.exists(path):
+                chromium_binary = path
+                logger.debug(f"Detectado Chromium en: {chromium_binary}")
+                break
+        
+        if chromium_binary:
+            opts.binary_location = chromium_binary
+        
         try:
+            # ESTRATEGIA: Intentar sin webdriver-manager primero (más rápido, evita version mismatch)
+            logger.debug("BuscadorProp: Intentando Chrome sin webdriver-manager...")
+            driver = webdriver.Chrome(options=opts)
+            logger.debug("✅ BuscadorProp: Chrome inicializado correctamente")
+            
+        except Exception as direct_error:
+            error_msg_direct = str(direct_error)
+            logger.debug(f"BuscadorProp: Fallback necesario. Error directo: {error_msg_direct[:100]}")
+            
+            # Si falla, intentar con webdriver-manager como fallback
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-            except:
-                driver = webdriver.Chrome(options=opts)
-            
+                logger.debug("BuscadorProp: Intentando con webdriver-manager...")
+                driver_path = ChromeDriverManager().install()
+                logger.debug(f"ChromeDriver instalado en: {driver_path}")
+                driver = webdriver.Chrome(service=Service(driver_path), options=opts)
+                logger.debug("✅ BuscadorProp: Chrome inicializado con webdriver-manager")
+                
+            except ModuleNotFoundError:
+                logger.error(f"BuscadorProp error: webdriver_manager no instalado")
+                logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona}")
+                return []
+                
+            except Exception as wdm_error:
+                error_msg_wdm = str(wdm_error)
+                logger.error(f"BuscadorProp error: Ambos métodos fallaron")
+                logger.error(f"  Directo: {error_msg_direct[:150]}")
+                logger.error(f"  WebDriver-manager: {error_msg_wdm[:150]}")
+                logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona}")
+                return []
+        
+        try:
             if debug:
                 logger.info(f"BuscadorProp: {base_url}")
             
@@ -800,7 +921,12 @@ class BuscadorPropScraper:
                 logger.info(f"Extraídas {len(out)} propiedades")
         
         except Exception as e:
-            logger.error(f"BuscadorProp error: {e}")
+            error_msg = str(e)
+            if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
+                logger.error(f"BuscadorProp error: Chromedriver fallo (code 127 - dependencias del sistema): {e}")
+                logger.warning(f"BuscadorProp: No se puede descargar propiedades - entorno sin soporte para Selenium")
+            else:
+                logger.error(f"BuscadorProp error: {e}")
         
         finally:
             if driver:

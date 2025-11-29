@@ -16,3 +16,9 @@ level = "info"
 headless = true
 runOnSave = true
 maxUploadSize = 200
+# Aumentar timeout para scrapers y descarga de ChromeDriver
+maxMessageSize = 50
+enableXsrfProtection = false
+
+[browser]
+gatherUsageStats = false

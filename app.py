@@ -9,6 +9,34 @@ import time
 import threading
 import shutil
 
+# Detectar si estamos en Streamlit Cloud
+IS_STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SERVER_HEADLESS') == 'true' or os.path.exists('/home/appuser')
+
+# En Streamlit Cloud, preparar webdriver-manager ANTES de que se intente usar
+if IS_STREAMLIT_CLOUD:
+    # Establecer variables de entorno para webdriver-manager
+    os.environ['WDM_CACHE_DIR'] = '/tmp/.wdm_cache'
+    os.environ['WDM_LOG_LEVEL'] = 'INFO'
+    
+    # Crear directorio de cache si no existe
+    try:
+        os.makedirs('/tmp/.wdm_cache', exist_ok=True)
+    except:
+        pass
+    
+    try:
+        import subprocess
+        import sys
+        # Ejecutar fix_chromedriver.py para detectar versión de Chromium e instalar ChromeDriver compatible
+        result = subprocess.run([sys.executable, "fix_chromedriver.py"], 
+                              capture_output=True, text=True, timeout=60)
+        if result.returncode == 0:
+            print("✅ ChromeDriver preparado para Streamlit Cloud")
+        else:
+            print(f"⚠️ Warning en fix_chromedriver: {result.stderr[:200]}")
+    except Exception as e:
+        print(f"⚠️ No se pudo ejecutar fix_chromedriver.py: {e}")
+
 # Configuración
 st.set_page_config(
     page_title="Agente RAG Inmobiliario", 
@@ -16,6 +44,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Limpiar caché de funciones para evitar inconsistencias con ChromaDB
+@st.cache_resource(show_spinner=False)
+def init_app():
+    """Función para inicializar la aplicación una sola vez"""
+    return True
+
+init_app()
 
 # CSS personalizado para diseño premium
 st.markdown("""
@@ -445,7 +481,12 @@ def cargar_sistema():
         # Crear estructura mínima pero válida
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer('all-MiniLM-L6-v2')
-        chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+        # Usar cliente en memoria en Streamlit Cloud, persistente en local
+        if IS_STREAMLIT_CLOUD:
+            logger.info("Detectado Streamlit Cloud - usando ChromaDB en memoria")
+            chroma_client = chromadb.EphemeralClient()
+        else:
+            chroma_client = chromadb.PersistentClient(path="data/chroma_data")
         # Crear colección vacía
         try:
             chroma_client.delete_collection("propiedades")
@@ -459,8 +500,11 @@ def cargar_sistema():
     df = df.reset_index(drop=True)
     
     if df.empty:
-        logger.error("No se encontraron propiedades válidas después de filtrar")
-        return None, None, None
+        logger.warning("No se encontraron propiedades válidas. Inicializando con BD vacía")
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        # Retornar sin colección si la BD está vacía
+        return model, None, pd.DataFrame()
     
     logger.info(f"Cargadas {len(df)} propiedades de BD SQLite")
     
@@ -472,7 +516,12 @@ def cargar_sistema():
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode(df['text'].tolist())
     
-    chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+    # Usar cliente en memoria en Streamlit Cloud, persistente en local
+    if IS_STREAMLIT_CLOUD:
+        logger.info("Detectado Streamlit Cloud - usando ChromaDB en memoria")
+        chroma_client = chromadb.EphemeralClient()
+    else:
+        chroma_client = chromadb.PersistentClient(path="data/chroma_data")
     
     # Intentar obtener la colección existente
     try:
@@ -481,56 +530,78 @@ def cargar_sistema():
         logger.info(f"Colección existente encontrada con {docs_existentes} documentos")
         
         # IMPORTANTE: Si tiene menos documentos que la BD actual, regenerar
-        # Esto evita cachés obsoletos o incompletos
-        if docs_existentes >= len(df) * 0.8:  # Si tiene al menos 80% de las propiedades, usar
+        # Comparar con el número real de propiedades en el CSV
+        if docs_existentes == len(df):  # Solo usar si tiene EXACTAMENTE el mismo número
+            logger.info(f"ChromaDB actualizado y sincronizado ({docs_existentes} docs)")
             return model, collection, df
         else:
-            logger.warning(f"Colección incompleta ({docs_existentes}/{len(df)} docs). Regenerando...")
+            logger.warning(f"Discrepancia detectada: ChromaDB tiene {docs_existentes} docs pero CSV tiene {len(df)}. Regenerando...")
     except:
         pass
     
     # Si no existe o está vacía, crearla
-    logger.info("Creando colección nueva...")
+    logger.info("Preparando colección ChromaDB...")
+    
+    collection = None
+    # Intentar crear colección de forma simple
     try:
-        chroma_client.delete_collection("propiedades")
-    except:
-        pass
-    
-    collection = chroma_client.create_collection("propiedades")
-    logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
-    
-    for i, row in df.iterrows():
-        # Validar ID
-        row_id = str(row['id']).strip() if row['id'] else None
-        if not row_id or row_id == "nan" or row_id == "None":
-            logger.debug(f"Saltando fila {i}: ID vacío o inválido")
-            continue
-        
-        # Limpiar metadatos
-        metadata = row.to_dict()
-        for key in metadata:
-            if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
-                metadata[key] = ""
-        
+        # Primero intentar obtener la existente
         try:
-            collection.add(
-                documents=[row['text']],
-                embeddings=[embeddings[i]],
-                metadatas=[metadata],
-                ids=[row_id]
-            )
-        except Exception as e:
-            logger.debug(f"Error agregando a ChromaDB (fila {i}): {e}")
-            continue
+            collection = chroma_client.get_collection("propiedades")
+            logger.info("Usando colección existente")
+        except:
+            # Si no existe, crear nueva
+            collection = chroma_client.create_collection("propiedades")
+            logger.info("Colección nueva creada")
+        
+        # Si la colección existe pero está vacía o desincronizada, agregar documentos
+        if collection:
+            logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
+            
+            for i, row in df.iterrows():
+                # Validar ID
+                row_id = str(row['id']).strip() if row['id'] else None
+                if not row_id or row_id == "nan" or row_id == "None":
+                    continue
+                
+                # Limpiar metadatos
+                metadata = row.to_dict()
+                for key in metadata:
+                    if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
+                        metadata[key] = ""
+                
+                try:
+                    collection.add(
+                        documents=[row['text']],
+                        embeddings=[embeddings[i]],
+                        metadatas=[metadata],
+                        ids=[row_id]
+                    )
+                except:
+                    # Si falla al agregar un documento, continuar
+                    continue
+            
+            logger.info(f"✅ ChromaDB procesado")
+            return model, collection, df
+    except Exception as e:
+        logger.error(f"Error crítico con ChromaDB: {e}. Continuando sin ChromaDB...")
+        # Si ChromaDB falla completamente, crear un stub que no lance errores
+        collection = None
     
-    logger.info(f"✅ ChromaDB listo con {collection.count()} documentos")
+    # Si no tenemos colección, crear un mock para que no falle
+    if collection is None:
+        logger.warning("ChromaDB no disponible, usando fallback")
+        # Retornar con colección None - manejaremos esto en las funciones de búsqueda
+        return model, None, df
+    
+    # Fallback final (nunca debería llegar aquí, pero por si acaso)
     return model, collection, df
 
 model, collection, df_propiedades = cargar_sistema()
 
-# Validar que se cargó correctamente
-if model is None or collection is None:
-    st.error("❌ Error: No se pudo cargar la base de datos. Verifica que exista data/properties.db")
+# Validar que se cargó correctamente - solo model es crítico
+if model is None:
+    st.error("❌ Error: No se pudo cargar el modelo. Verifica que exista data/properties.db")
     st.stop()
 
 # df_propiedades puede estar vacío inicialmente (usuario descargará propiedades después)
@@ -539,33 +610,111 @@ if df_propiedades is None:
 
 bd_vacia = df_propiedades.empty
 
+# Sincronización de ChromaDB con BD actual (solo si collection no es None)
+if not bd_vacia and collection is not None:
+    try:
+        docs_chroma = collection.count()
+        docs_csv = len(df_propiedades)
+        
+        # Log de sincronización
+        if docs_chroma != docs_csv:
+            logger.warning(f"⚠️ SYNC ERROR: ChromaDB tiene {docs_chroma} docs pero CSV tiene {docs_csv}. Regenerando...")
+            # Regenerar ChromaDB completo
+            try:
+                # Usar cliente en memoria en Streamlit Cloud, persistente en local
+                if IS_STREAMLIT_CLOUD:
+                    chroma_client = chromadb.EphemeralClient()
+                else:
+                    chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+                try:
+                    chroma_client.delete_collection("propiedades")
+                except:
+                    pass
+                
+                # Reconstruir embeddings
+                from sentence_transformers import SentenceTransformer
+                def make_text(row):
+                    desc = row.get('descripcion', '') if isinstance(row, dict) else row['descripcion']
+                    return f"{row['tipo']} en {row['zona']}. {desc}"
+                
+                df_propiedades['text'] = df_propiedades.apply(make_text, axis=1)
+                embeddings = model.encode(df_propiedades['text'].tolist())
+                
+                # Crear colección con reintentos
+                for intento in range(3):
+                    try:
+                        collection = chroma_client.create_collection("propiedades")
+                        break
+                    except Exception as e:
+                        logger.debug(f"Intento {intento+1} de crear colección falló: {e}")
+                        if intento == 2:
+                            raise
+                
+                logger.info(f"Agregando {len(df_propiedades)} propiedades a ChromaDB...")
+                
+                for i, row in df_propiedades.iterrows():
+                    row_id = str(row['id']).strip() if row['id'] else None
+                    if not row_id or row_id == "nan" or row_id == "None":
+                        continue
+                    
+                    metadata = row.to_dict()
+                    for key in metadata:
+                        if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
+                            metadata[key] = ""
+                    
+                    try:
+                        collection.add(
+                            documents=[row['text']],
+                            embeddings=[embeddings[i]],
+                            metadatas=[metadata],
+                            ids=[row_id]
+                        )
+                    except:
+                        continue
+                
+                try:
+                    docs_count = collection.count()
+                    logger.info(f"✅ ChromaDB regenerado con {docs_count} documentos")
+                except:
+                    logger.info(f"✅ ChromaDB regenerado")
+            except Exception as e:
+                logger.error(f"Error regenerando ChromaDB: {e}")
+        else:
+            logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
+    except Exception as e:
+        logger.warning(f"Error en sincronización de ChromaDB: {e}")
+
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
     """Búsqueda RAG semántica mejorada con procesamiento inteligente sin API."""
     # Si la BD está vacía, no hay nada que buscar
-    if bd_vacia:
+    if bd_vacia or collection is None:
         return [], "Base de datos vacía. Descarga propiedades primero desde 'Descargar de Internet'"
     
-    # Procesar la query para entender mejor la intención
-    search_query = mejorar_query(query)
-    
-    # Búsqueda semántica (pedir más para paginación)
-    k_expanded = min(max(k, 50), len(df_propiedades))  # Mínimo 50 para mejor cobertura de zonas
-    query_emb = model.encode([search_query])
-    results = collection.query(query_embeddings=query_emb.tolist(), n_results=k_expanded)
-    
-    # Retornar registros completos de BD
-    propiedades_recomendadas = []
-    for result_id in results['ids'][0]:
-        if result_id in df_propiedades['id'].astype(str).values:
-            # Obtener el registro completo de la BD
-            prop_row = df_propiedades[df_propiedades['id'].astype(str) == result_id].iloc[0]
-            propiedades_recomendadas.append(prop_row.to_dict())
-    
-    if not propiedades_recomendadas:
-        return [], "No hay propiedades que combinen con tu búsqueda. Intenta con otros criterios."
-    
-    return propiedades_recomendadas, None
+    try:
+        # Procesar la query para entender mejor la intención
+        search_query = mejorar_query(query)
+        
+        # Búsqueda semántica (pedir más para paginación)
+        k_expanded = min(max(k, 50), len(df_propiedades))  # Mínimo 50 para mejor cobertura de zonas
+        query_emb = model.encode([search_query])
+        results = collection.query(query_embeddings=query_emb.tolist(), n_results=k_expanded)
+        
+        # Retornar registros completos de BD
+        propiedades_recomendadas = []
+        for result_id in results['ids'][0]:
+            if result_id in df_propiedades['id'].astype(str).values:
+                # Obtener el registro completo de la BD
+                prop_row = df_propiedades[df_propiedades['id'].astype(str) == result_id].iloc[0]
+                propiedades_recomendadas.append(prop_row.to_dict())
+        
+        if not propiedades_recomendadas:
+            return [], "No hay propiedades que combinen con tu búsqueda. Intenta con otros criterios."
+        
+        return propiedades_recomendadas, None
+    except Exception as e:
+        logger.warning(f"Error en búsqueda RAG: {e}")
+        return [], f"Error en búsqueda: {str(e)}"
 
 def mejorar_query(query):
     """Mejora la query usando procesamiento inteligente sin API."""
@@ -1266,17 +1415,20 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             localidades_list = ["Todas", "Palermo", "Recoleta", "San Isidro", "Belgrano", "Flores", 
                                "Caballito", "La Boca", "San Telmo", "Villa Crespo", "Colegiales",
                                "Lomas de Zamora", "Temperley", "La Matanza"]
+            default_localidad = ["Palermo"]
         else:
             # Obtener localidades de la provincia seleccionada
             municipios = geo_data.get("municipios_por_provincia", {}).get(provincia, [])
             localidades_list = ["Todas"] + [m["nombre"] for m in municipios]
+            # Usar la primera localidad (que no sea "Todas") como default
+            default_localidad = [localidades_list[1]] if len(localidades_list) > 1 else ["Todas"]
         
         localidad_seleccionada = st.multiselect(
             "📍 Localidad",
             localidades_list,
-            default=["Palermo"]
+            default=default_localidad
         )
-        localidades_seleccionadas = localidad_seleccionada if localidad_seleccionada else ["Palermo"]
+        localidades_seleccionadas = localidad_seleccionada if localidad_seleccionada else default_localidad
         
         limite = st.number_input("📊 Cantidad", 1, 100, 10)
         
@@ -1312,7 +1464,15 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             stats_container = st.empty()
             
             try:
-                from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
+                # Intentar importar scrapers
+                try:
+                    from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
+                except ImportError as ie:
+                    status_container.error(f"❌ Error de importación: {ie}")
+                    logger.error(f"Error importando scrapers: {ie}")
+                    st.session_state.scraper_running = False
+                    st.stop()
+                
                 db = PropertyDatabase()
                 total_nuevas = 0
                 total_descargadas = 0
@@ -1331,28 +1491,34 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_container.progress(porcentaje_zona / 100.0, text=f"📍 Descargando **{localidad}**... ({idx + 1}/{len(localidades_seleccionadas)} zonas)")
                     details_container.info(f"⏳ Buscando propiedades de {localidad}...")
                     
-                    # Descargar propiedades
-                    props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
-                    
-                    # Mostrar contador durante descarga
-                    props_encontradas = len(props)
-                    total_descargadas += props_encontradas
-                    
-                    stats_container.metric(
-                        f"🏠 {localidad}",
-                        f"{props_encontradas} propiedades encontradas"
-                    )
-                    
-                    nuevas = db.agregar_propiedades(props)
-                    total_nuevas += nuevas
-                    
-                    # Actualizar detalles con información detallada
-                    details_container.success(
-                        f"✓ {localidad}: "
-                        f"**{props_encontradas}** encontradas → "
-                        f"**{nuevas}** nuevas agregadas | "
-                        f"Total acumulado: **{total_nuevas}**"
-                    )
+                    try:
+                        # Descargar propiedades
+                        logger.info(f"Iniciando descarga de {localidad}")
+                        props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                        logger.info(f"Descargadas {len(props)} propiedades de {localidad}")
+                        
+                        # Mostrar contador durante descarga
+                        props_encontradas = len(props)
+                        total_descargadas += props_encontradas
+                        
+                        stats_container.metric(
+                            f"🏠 {localidad}",
+                            f"{props_encontradas} propiedades encontradas"
+                        )
+                        
+                        nuevas = db.agregar_propiedades(props)
+                        total_nuevas += nuevas
+                        
+                        # Actualizar detalles con información detallada
+                        details_container.success(
+                            f"✓ {localidad}: "
+                            f"**{props_encontradas}** encontradas → "
+                            f"**{nuevas}** nuevas agregadas | "
+                            f"Total acumulado: **{total_nuevas}**"
+                        )
+                    except Exception as zone_error:
+                        logger.error(f"Error descargando {localidad}: {zone_error}")
+                        details_container.warning(f"⚠️ {localidad}: {str(zone_error)}")
                     
                     # Actualizar barra DESPUÉS de descargar esta zona
                     porcentaje_completado = ((idx + 1) / len(localidades_seleccionadas)) * 100
@@ -1382,10 +1548,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                status_container.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga portal: {ie}")
+                status_container.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                status_container.error(f"❌ Error: {str(e)}")
+                logger.error(f"Error general en descarga portal: {type(e).__name__}: {str(e)}", exc_info=True)
+                status_container.error(f"❌ Error en descarga: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
     
     except Exception as e:
@@ -1451,28 +1619,31 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_container.progress(porcentaje_zona / 100.0, text=f"📍 Descargando **{zona}**... ({idx + 1}/{len(zonas_seleccionadas)} zonas)")
                     details_container.info(f"⏳ Buscando propiedades de {zona}...")
                     
-                    # Descargar propiedades
-                    props = BuscadorPropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
-                    
-                    # Mostrar contador durante descarga
-                    props_encontradas = len(props)
-                    total_descargadas += props_encontradas
-                    
-                    stats_container.metric(
-                        f"🏠 {zona}",
-                        f"{props_encontradas} propiedades encontradas"
-                    )
-                    
-                    nuevas = db.agregar_propiedades(props)
-                    total_nuevas += nuevas
-                    
-                    # Actualizar detalles con información detallada
-                    details_container.success(
-                        f"✓ {zona}: "
-                        f"**{props_encontradas}** encontradas → "
-                        f"**{nuevas}** nuevas agregadas | "
-                        f"Total acumulado: **{total_nuevas}**"
-                    )
+                    try:
+                        # Descargar propiedades
+                        props = BuscadorPropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                        
+                        # Mostrar contador durante descarga
+                        props_encontradas = len(props)
+                        total_descargadas += props_encontradas
+                        
+                        stats_container.metric(
+                            f"🏠 {zona}",
+                            f"{props_encontradas} propiedades encontradas"
+                        )
+                        
+                        nuevas = db.agregar_propiedades(props)
+                        total_nuevas += nuevas
+                        
+                        # Actualizar detalles con información detallada
+                        details_container.success(
+                            f"✓ {zona}: "
+                            f"**{props_encontradas}** encontradas → "
+                            f"**{nuevas}** nuevas agregadas | "
+                            f"Total acumulado: **{total_nuevas}**"
+                        )
+                    except Exception as zone_error:
+                        details_container.warning(f"⚠️ {zona}: {str(zone_error)}")
                     
                     # Actualizar barra DESPUÉS de descargar esta zona
                     porcentaje_completado = ((idx + 1) / len(zonas_seleccionadas)) * 100
@@ -1502,10 +1673,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                status_container.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga fallback: {ie}")
+                status_container.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                status_container.error(f"❌ Error: {str(e)}")
+                logger.error(f"Error general en descarga fallback: {type(e).__name__}: {str(e)}", exc_info=True)
+                status_container.error(f"❌ Error en descarga: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
 
 # DESHABILITADO - Sección de tareas programadas
