@@ -513,9 +513,14 @@ def cargar_sistema():
         logger.warning(f"Error creando colección: {e}. Intentando obtener existente...")
         try:
             collection = chroma_client.get_collection("propiedades")
-            # Si existe, limpiarla completamente
-            collection.delete(where={})
-            logger.info("Colección limpiada para insertar datos nuevos")
+            # Si existe, limpiarla completamente buscando todos los IDs
+            try:
+                all_ids = collection.get()['ids']
+                if all_ids:
+                    collection.delete(ids=all_ids)
+                    logger.info("Colección limpiada para insertar datos nuevos")
+            except:
+                logger.info("Colección vacía o no se pudo limpiar completamente")
         except Exception as e2:
             logger.error(f"Error crítico con ChromaDB: {e2}")
             raise
@@ -592,7 +597,13 @@ if not bd_vacia:
                     collection = chroma_client.create_collection("propiedades")
                 except:
                     collection = chroma_client.get_collection("propiedades")
-                    collection.delete(where={})
+                    # Limpiar todos los documentos de la colección
+                    try:
+                        all_ids = collection.get()['ids']
+                        if all_ids:
+                            collection.delete(ids=all_ids)
+                    except:
+                        pass
                 
                 logger.info(f"Agregando {len(df_propiedades)} propiedades a ChromaDB...")
                 
