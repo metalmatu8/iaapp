@@ -1418,7 +1418,15 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             stats_container = st.empty()
             
             try:
-                from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
+                # Intentar importar scrapers
+                try:
+                    from src.scrapers import ArgenpropScraper, BuscadorPropScraper, PropertyDatabase
+                except ImportError as ie:
+                    status_container.error(f"❌ Error de importación: {ie}")
+                    logger.error(f"Error importando scrapers: {ie}")
+                    st.session_state.scraper_running = False
+                    st.stop()
+                
                 db = PropertyDatabase()
                 total_nuevas = 0
                 total_descargadas = 0
@@ -1439,7 +1447,9 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     
                     try:
                         # Descargar propiedades
+                        logger.info(f"Iniciando descarga de {localidad}")
                         props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                        logger.info(f"Descargadas {len(props)} propiedades de {localidad}")
                         
                         # Mostrar contador durante descarga
                         props_encontradas = len(props)
@@ -1461,6 +1471,7 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                             f"Total acumulado: **{total_nuevas}**"
                         )
                     except Exception as zone_error:
+                        logger.error(f"Error descargando {localidad}: {zone_error}")
                         details_container.warning(f"⚠️ {localidad}: {str(zone_error)}")
                     
                     # Actualizar barra DESPUÉS de descargar esta zona
