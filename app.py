@@ -636,10 +636,6 @@ if not bd_vacia:
             logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
     except Exception as e:
         logger.warning(f"Error en sincronización de ChromaDB: {e}")
-        else:
-            logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
-    except Exception as e:
-        logger.warning(f"Error en sincronización de ChromaDB: {e}")
 
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
