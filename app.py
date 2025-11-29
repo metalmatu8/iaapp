@@ -557,6 +557,7 @@ def cargar_sistema():
                     continue
             
             logger.info(f"✅ ChromaDB procesado")
+            return model, collection, df
     except Exception as e:
         logger.error(f"Error crítico con ChromaDB: {e}. Continuando sin ChromaDB...")
         # Si ChromaDB falla completamente, crear un stub que no lance errores
@@ -567,6 +568,9 @@ def cargar_sistema():
         logger.warning("ChromaDB no disponible, usando fallback")
         # Retornar con colección None - manejaremos esto en las funciones de búsqueda
         return model, None, df
+    
+    # Fallback final (nunca debería llegar aquí, pero por si acaso)
+    return model, collection, df
 
 model, collection, df_propiedades = cargar_sistema()
 
