@@ -1502,10 +1502,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                status_container.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga portal: {ie}")
+                status_container.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                status_container.error(f"❌ Error: {str(e)}")
+                logger.error(f"Error general en descarga portal: {type(e).__name__}: {str(e)}", exc_info=True)
+                status_container.error(f"❌ Error en descarga: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
     
     except Exception as e:
@@ -1600,19 +1602,6 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     # Actualizar barra DESPUÉS de descargar esta zona
                     porcentaje_completado = ((idx + 1) / len(zonas_seleccionadas)) * 100
                     progress_container.progress(porcentaje_completado / 100.0, text=f"✅ **{total_descargadas}** propiedades descargadas ({int(porcentaje_completado)}%)")
-                    total_nuevas += nuevas
-                    
-                    # Actualizar detalles con información detallada
-                    details_container.success(
-                        f"✓ {zona}: "
-                        f"**{props_encontradas}** encontradas → "
-                        f"**{nuevas}** nuevas agregadas | "
-                        f"Total acumulado: **{total_nuevas}**"
-                    )
-                    
-                    # Actualizar barra DESPUÉS de descargar esta zona
-                    porcentaje_completado = ((idx + 1) / len(zonas_seleccionadas)) * 100
-                    progress_container.progress(porcentaje_completado / 100.0, text=f"✅ **{total_descargadas}** propiedades descargadas ({int(porcentaje_completado)}%)")
                 
                 if not st.session_state.scraper_stop_flag:
                     status_container.success(f"✅ ¡Descarga completada!")
@@ -1638,10 +1627,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                status_container.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga fallback: {ie}")
+                status_container.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                status_container.error(f"❌ Error: {str(e)}")
+                logger.error(f"Error general en descarga fallback: {type(e).__name__}: {str(e)}", exc_info=True)
+                status_container.error(f"❌ Error en descarga: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
 
 # DESHABILITADO - Sección de tareas programadas

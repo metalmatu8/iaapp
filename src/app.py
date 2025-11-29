@@ -503,10 +503,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                st.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga portal: {ie}")
+                st.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                logger.error(f"Error general en descarga portal: {type(e).__name__}: {str(e)}", exc_info=True)
+                st.error(f"Error: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
     
     except Exception as e:
@@ -583,10 +585,12 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                 st.session_state.scraper_running = False
                 st.session_state.scraper_stop_flag = False
             except ImportError as ie:
-                st.error(f"❌ Falta instalar: {ie}")
+                logger.error(f"ImportError en descarga fallback: {ie}")
+                st.error(f"❌ Falta instalar paquete: {ie}")
                 st.session_state.scraper_running = False
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                logger.error(f"Error general en descarga fallback: {type(e).__name__}: {str(e)}", exc_info=True)
+                st.error(f"Error: {type(e).__name__}: {str(e)}")
                 st.session_state.scraper_running = False
 
 # Sección de tareas programadas
