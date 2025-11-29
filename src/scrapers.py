@@ -401,6 +401,14 @@ class BuscadorPropScraper:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+            except ModuleNotFoundError as module_error:
+                # webdriver_manager no está instalado
+                if "webdriver_manager" in str(module_error):
+                    logger.debug(f"BuscadorProp: webdriver_manager no disponible, devolviendo detalles vacíos")
+                    return detalles
+                else:
+                    logger.debug(f"BuscadorProp: Error de módulo para {url}, devolviendo detalles vacíos")
+                    return detalles
             except Exception as driver_init_error:
                 # Si falla la inicialización del driver, es probable que sea por dependencias del sistema
                 error_msg = str(driver_init_error)
@@ -689,6 +697,15 @@ class BuscadorPropScraper:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
                 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
+            except ModuleNotFoundError as module_error:
+                # webdriver_manager no está instalado
+                if "webdriver_manager" in str(module_error):
+                    logger.error(f"BuscadorProp error: webdriver_manager no instalado. {module_error}")
+                    logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona} - falta instalar webdriver_manager")
+                    return []
+                else:
+                    logger.error(f"BuscadorProp error de módulo: {module_error}")
+                    return []
             except Exception as driver_init_error:
                 # Si falla la inicialización del driver, es probable que sea por dependencias del sistema
                 error_msg = str(driver_init_error)
@@ -697,7 +714,7 @@ class BuscadorPropScraper:
                     logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona} - entorno sin soporte para Selenium")
                     return []
                 else:
-                    logger.error(f"BuscadorProp error al inicializar driver: {driver_init_error}")
+                    logger.error(f"BuscadorProp error al inicializar driver: {type(driver_init_error).__name__}: {driver_init_error}")
                     return []
             
             if debug:
