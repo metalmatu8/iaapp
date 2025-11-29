@@ -499,31 +499,25 @@ def cargar_sistema():
         pass
     
     # Si no existe o está vacía, crearla
-    logger.info("Creando colección nueva...")
-    try:
-        chroma_client.delete_collection("propiedades")
-    except Exception as e:
-        logger.debug(f"No se pudo eliminar colección anterior: {e}")
+    logger.info("Preparando colección ChromaDB...")
     
-    # Intentar crear con manejo de errores
-    try:
-        collection = chroma_client.create_collection("propiedades")
-    except Exception as e:
-        # Si falla, intentar obtener la colección existente
-        logger.warning(f"Error creando colección: {e}. Intentando obtener existente...")
+    # Siempre eliminar e intentar crear nueva (más seguro que limpiar)
+    for intento in range(3):
         try:
-            collection = chroma_client.get_collection("propiedades")
-            # Si existe, limpiarla completamente buscando todos los IDs
-            try:
-                all_ids = collection.get()['ids']
-                if all_ids:
-                    collection.delete(ids=all_ids)
-                    logger.info("Colección limpiada para insertar datos nuevos")
-            except:
-                logger.info("Colección vacía o no se pudo limpiar completamente")
-        except Exception as e2:
-            logger.error(f"Error crítico con ChromaDB: {e2}")
-            raise
+            chroma_client.delete_collection("propiedades")
+            logger.debug(f"Colección eliminada (intento {intento+1})")
+        except:
+            pass
+        
+        try:
+            collection = chroma_client.create_collection("propiedades")
+            logger.debug(f"Colección creada (intento {intento+1})")
+            break
+        except Exception as e:
+            logger.debug(f"Error creando colección (intento {intento+1}): {e}")
+            if intento == 2:
+                logger.error(f"No se pudo crear colección después de 3 intentos: {e}")
+                raise
     
     logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
     
@@ -551,7 +545,13 @@ def cargar_sistema():
             logger.debug(f"Error agregando a ChromaDB (fila {i}): {e}")
             continue
     
-    logger.info(f"✅ ChromaDB listo con {collection.count()} documentos")
+    try:
+        docs_count = collection.count()
+        logger.info(f"✅ ChromaDB listo con {docs_count} documentos")
+    except Exception as e:
+        logger.warning(f"No se pudo contar documentos, pero colección debería estar lista: {e}")
+        docs_count = len(df)
+    
     return model, collection, df
 
 model, collection, df_propiedades = cargar_sistema()
@@ -593,17 +593,15 @@ if not bd_vacia:
                 df_propiedades['text'] = df_propiedades.apply(make_text, axis=1)
                 embeddings = model.encode(df_propiedades['text'].tolist())
                 
-                try:
-                    collection = chroma_client.create_collection("propiedades")
-                except:
-                    collection = chroma_client.get_collection("propiedades")
-                    # Limpiar todos los documentos de la colección
+                # Crear colección con reintentos
+                for intento in range(3):
                     try:
-                        all_ids = collection.get()['ids']
-                        if all_ids:
-                            collection.delete(ids=all_ids)
-                    except:
-                        pass
+                        collection = chroma_client.create_collection("propiedades")
+                        break
+                    except Exception as e:
+                        logger.debug(f"Intento {intento+1} de crear colección falló: {e}")
+                        if intento == 2:
+                            raise
                 
                 logger.info(f"Agregando {len(df_propiedades)} propiedades a ChromaDB...")
                 
@@ -627,9 +625,17 @@ if not bd_vacia:
                     except:
                         continue
                 
-                logger.info(f"✅ ChromaDB regenerado con {collection.count()} documentos")
+                try:
+                    docs_count = collection.count()
+                    logger.info(f"✅ ChromaDB regenerado con {docs_count} documentos")
+                except:
+                    logger.info(f"✅ ChromaDB regenerado")
             except Exception as e:
                 logger.error(f"Error regenerando ChromaDB: {e}")
+        else:
+            logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
+    except Exception as e:
+        logger.warning(f"Error en sincronización de ChromaDB: {e}")
         else:
             logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
     except Exception as e:
