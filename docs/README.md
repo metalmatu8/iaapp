@@ -32,39 +32,16 @@ Un agente conversacional inteligente que utiliza la arquitectura RAG (Retrieval-
 
 ## 📋 Estructura del Proyecto
 
-El proyecto está organizando profesionalmente en carpetas:
-
 ```
-iaapp/
-├── src/                          # 📝 Código fuente
-│   ├── app.py                   # Aplicación principal (Streamlit)
-│   ├── scrapers.py              # Scrapers (Argenprop, BuscadorProp, Georef, BD)
-│   ├── config.py                # Configuración
-│   └── tools.py                 # Utilidades
-│
-├── data/                         # 💾 Base de datos
-│   ├── properties.db            # BD SQLite con propiedades
-│   ├── properties_expanded.csv   # Exportación CSV
-│   └── chroma_data/             # Vector store (ChromaDB)
-│
-├── tests/                        # ✅ Tests (10 test files)
-│   └── test_*.py
-│
-├── docs/                         # 📚 Documentación (29 archivos)
-│   ├── README.md
-│   ├── ARCHITECTURE_v2_3.md
-│   └── ...
-│
-├── archive/                      # 🗂️ Archivos antiguos
-│   ├── debug_*.py
-│   └── *backup*.py
-│
-├── run.py                        # 🚀 Punto de entrada
-├── requirements.txt              # Dependencias
-└── STRUCTURE.md                  # Guía de estructura
+├── app.py                    # Aplicación principal (Streamlit)
+├── config.py                 # Configuración centralizada
+├── llm_integration.py        # Integración LLM (OpenAI/Ollama)
+├── tools.py                  # Tool Use para APIs externas (Fase 3)
+├── properties.csv            # Dataset de propiedades
+├── requirements.txt          # Dependencias Python
+├── .env.example              # Plantilla de variables de entorno
+└── README.md                 # Este archivo
 ```
-
-Ver `STRUCTURE.md` para más detalles.
 
 ## 🚀 Instalación y Uso
 
@@ -89,33 +66,6 @@ source .venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
-
-### Paso 4: Ejecutar la aplicación
-
-**Opción A (Recomendado): Scripts de desarrollo**
-
-Windows:
-```bash
-dev.bat
-```
-
-Linux/Mac:
-```bash
-bash dev.sh
-```
-
-**Opción B: Desde el directorio src/**
-```bash
-cd src
-streamlit run app.py
-```
-
-**Opción C: Desde la raíz (requiere configuración manual)**
-```bash
-streamlit run src/app.py
-```
-
-La aplicación se abrirá en `http://localhost:8501`
 
 ### Paso 4: Configurar variables de entorno (opcional)
 ```bash

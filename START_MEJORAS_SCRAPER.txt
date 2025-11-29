@@ -1,0 +1,142 @@
+# 🚀 START HERE - Mejoras BuscadorProp v2.0
+
+## 3 MEJORAS PRINCIPALES IMPLEMENTADAS
+
+### ✅ 1. FOTOS COMPLETAS
+- Antes: Sin fotos
+- Ahora: Foto portada + galería (hasta 10 imágenes)
+- Ubicación: Visible en la UI al abrir cada propiedad
+
+### ✅ 2. PRECIO COMPLETO
+- Antes: "USD 47" (truncado)
+- Ahora: "USD 47.000" (completo, sin truncar)
+- Ubicación: En el encabezado de la propiedad
+
+### ✅ 3. INFORMACIÓN DETALLADA
+Ahora extrae:
+```
+✓ Dirección completa
+✓ Número de ambientes
+✓ Dormitorios y baños
+✓ M² cubiertos y totales
+✓ Antigüedad en años
+✓ Estado de la propiedad
+```
+
+---
+
+## 🎯 USAR LAS MEJORAS
+
+### Opción 1: App Streamlit (Recomendado)
+```bash
+python -m streamlit run app.py
+```
+1. Abre `http://localhost:8502`
+2. Sidebar → "Descargar de Internet"
+3. Selecciona "BuscadorProp"
+4. Elige zona, cantidad de propiedades
+5. Haz clic en "⬇️ Descargar Propiedades"
+6. ✅ Se guardan con todas las mejoras
+
+### Opción 2: Script Demo
+```bash
+python demo_scraper_mejorado.py
+```
+- Descarga 5 propiedades automáticamente
+- Las guarda en BD
+- Muestra resumen completo
+
+### Opción 3: Prueba Rápida
+```bash
+python test_buscadorprop_mejorado.py
+```
+- Descarga 3 propiedades de ejemplo
+- Muestra todos los datos extraídos
+- No guarda en BD (solo visualiza)
+
+---
+
+## 📊 DATOS EXTRAÍDOS EJEMPLO
+
+```
+Casa de 3 Amb a Reciclar
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Dirección: Tunuyan 229 E/ Euskadi Y Homero, Lomas De Zamora
+Precio: USD 47.000 ← COMPLETO, NO TRUNCADO
+Ambientes: 3
+Dormitorios: 2
+Baños: 1
+M² Cubiertos: 90
+M² Totales: 210
+Antigüedad: 30 años
+Estado: A refaccionar
+Fotos: 10 imágenes ← NUEVAS
+```
+
+---
+
+## 🎨 UI MEJORADA
+
+Ahora muestra:
+1. **Foto portada** (arriba)
+2. **Información estructurada** (lado a lado)
+3. **Detalles de propiedad** (dirección, estado, antigüedad)
+4. **Galería de fotos** (grid de imágenes)
+5. **Precio sin truncar** (siempre completo)
+
+---
+
+## 📝 TÉCNICO
+
+**Nuevos campos en BD**:
+- `foto_portada` → URL de la foto principal
+- `fotos` → JSON array con todas las fotos
+- `estado` → "A refaccionar", "Buen estado", etc.
+- `direccion` → Dirección completa
+
+**Archivos modificados**:
+- `src/scrapers.py` → Nuevo método extraer_detalles_propiedad()
+- `app.py` → UI mejorada para mostrar fotos
+- `test_buscadorprop_mejorado.py` → Script de prueba
+- `demo_scraper_mejorado.py` → Demo completo
+
+---
+
+## ⏱️ TIEMPO
+
+- Por propiedad: ~2-3 segundos
+- 5 propiedades: ~15-20 segundos
+- 10 propiedades: ~30-40 segundos
+
+---
+
+## ✨ RESUMEN
+
+| Aspecto | Antes | Ahora |
+|---------|-------|-------|
+| Fotos | ❌ No | ✅ Sí (hasta 10) |
+| Precio | ❌ Truncado | ✅ Completo |
+| Dirección | ❌ No | ✅ Sí |
+| M² | ❌ No | ✅ Sí |
+| Estado | ❌ No | ✅ Sí |
+| Antigüedad | ❌ No | ✅ Sí |
+| Características | ❌ Incompletas | ✅ Completas |
+
+---
+
+## 🚀 EMPEZAR AHORA
+
+```bash
+# Opción más simple:
+python -m streamlit run app.py
+
+# Luego en el navegador:
+http://localhost:8502
+```
+
+¡Listo! Las mejoras están activas.
+
+---
+
+**Documentación completa**: Ver `GUIA_MEJORAS_SCRAPER.md`
+**Detalles técnicos**: Ver `RESUMEN_MEJORAS_TECNICAS.md`

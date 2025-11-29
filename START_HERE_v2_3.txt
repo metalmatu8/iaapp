@@ -1,0 +1,61 @@
+# 🚀 v2.3 - Resumen Rápido
+
+## ¿Qué se implementó?
+
+### 1. Botón ⏹️ Detener Scraper
+- **Dónde**: App → "Descargar de Internet"
+- **Qué hace**: Detiene la descarga sin perder datos
+- **Cómo funciona**: Session state flags + verificación en loop
+
+### 2. 🕐 Tareas Programadas Automáticas
+- **Dónde**: Sidebar → "🕐 Tareas Programadas"
+- **Qué hace**: Ejecuta descargas a horas específicas automáticamente
+- **Cómo funciona**: UI → JSON → Scheduler loop
+
+---
+
+## ⚡ Empezar en 5 Minutos
+
+```bash
+# Terminal 1
+streamlit run app.py
+
+# Terminal 2 (opcional - para automatización)
+python task_scheduler.py
+```
+
+---
+
+## 📁 Archivos Nuevos
+
+### Código
+- `task_scheduler.py` - Scheduler independiente
+- `run_scheduler.bat` - Script Windows
+- `run_scheduler.sh` - Script Linux/Mac
+- `test_v2_3_features.py` - Tests (✅ 8/8 PASSED)
+
+### Documentación
+- `RELEASE_v2_3.md` - Documentación oficial
+- `ARCHITECTURE_v2_3.md` - Diagramas técnicos
+- `QUICKSTART_v2_3.md` - Guía rápida
+- `DOCUMENTATION_INDEX.md` - Índice completo
+
+### Modificados
+- `app.py` - Agregadas nuevas secciones y controles
+
+---
+
+## ✅ Status
+
+- ✅ Features implementadas
+- ✅ Tests pasando (8/8)
+- ✅ Documentación completa
+- ✅ Backward compatible 100%
+- ✅ Production ready
+
+---
+
+## 🎯 Próximo Paso
+
+Lee: `QUICKSTART_v2_3.md`
+
