@@ -749,43 +749,59 @@ class BuscadorPropScraper:
         
         out: List[Dict] = []
         driver = None
+        
+        # Detectar si Chromium está instalado en el sistema (Streamlit Cloud)
+        chromium_paths = [
+            "/usr/bin/chromium-browser",  # Streamlit Cloud (antiguo)
+            "/usr/bin/chromium",          # Streamlit Cloud (actual)
+            "/snap/bin/chromium",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "C:\\Program Files\\Chromium\\Application\\chrome.exe",  # Windows
+        ]
+        chromium_binary = None
+        for path in chromium_paths:
+            if os.path.exists(path):
+                chromium_binary = path
+                logger.debug(f"Detectado Chromium en: {chromium_binary}")
+                break
+        
+        if chromium_binary:
+            opts.binary_location = chromium_binary
+        
         try:
+            # ESTRATEGIA: Intentar sin webdriver-manager primero (más rápido, evita version mismatch)
+            logger.debug("BuscadorProp: Intentando Chrome sin webdriver-manager...")
+            driver = webdriver.Chrome(options=opts)
+            logger.debug("✅ BuscadorProp: Chrome inicializado correctamente")
+            
+        except Exception as direct_error:
+            error_msg_direct = str(direct_error)
+            logger.debug(f"BuscadorProp: Fallback necesario. Error directo: {error_msg_direct[:100]}")
+            
+            # Si falla, intentar con webdriver-manager como fallback
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
                 from selenium.webdriver.chrome.service import Service
+                logger.debug("BuscadorProp: Intentando con webdriver-manager...")
                 driver_path = ChromeDriverManager().install()
                 logger.debug(f"ChromeDriver instalado en: {driver_path}")
                 driver = webdriver.Chrome(service=Service(driver_path), options=opts)
-            except ModuleNotFoundError as module_error:
-                # webdriver_manager no está instalado
-                if "webdriver_manager" in str(module_error):
-                    logger.error(f"BuscadorProp error: webdriver_manager no instalado. {module_error}")
-                    logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona} - falta instalar webdriver_manager")
-                    return []
-                else:
-                    logger.error(f"BuscadorProp error de módulo: {module_error}")
-                    return []
-            except Exception as driver_init_error:
-                # Si falla la inicialización del driver, es probable que sea por dependencias del sistema
-                error_msg = str(driver_init_error)
-                if "127" in error_msg or "unexpectedly exited" in error_msg or "chromedriver" in error_msg.lower():
-                    logger.error(f"BuscadorProp error: Chromedriver no disponible en este entorno (falta Chromium). {error_msg}")
-                    logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona} - entorno sin soporte para Selenium")
-                    return []
-                elif "session not created" in error_msg.lower() or "version" in error_msg.lower():
-                    # ChromeDriver version mismatch - intentar sin manager
-                    logger.error(f"BuscadorProp error: Version mismatch entre ChromeDriver y Chromium. {error_msg}")
-                    logger.debug(f"BuscadorProp: Intentando inicializar driver sin webdriver_manager...")
-                    try:
-                        driver = webdriver.Chrome(options=opts)
-                    except Exception as fallback_error:
-                        logger.error(f"BuscadorProp fallback también falló: {fallback_error}")
-                        logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona} - versiones incompatibles")
-                        return []
-                else:
-                    logger.error(f"BuscadorProp error al inicializar driver: {type(driver_init_error).__name__}: {driver_init_error}")
-                    return []
-            
+                logger.debug("✅ BuscadorProp: Chrome inicializado con webdriver-manager")
+                
+            except ModuleNotFoundError:
+                logger.error(f"BuscadorProp error: webdriver_manager no instalado")
+                logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona}")
+                return []
+                
+            except Exception as wdm_error:
+                error_msg_wdm = str(wdm_error)
+                logger.error(f"BuscadorProp error: Ambos métodos fallaron")
+                logger.error(f"  Directo: {error_msg_direct[:150]}")
+                logger.error(f"  WebDriver-manager: {error_msg_wdm[:150]}")
+                logger.warning(f"BuscadorProp: No se puede descargar propiedades de {zona}")
+                return []
+        
+        try:
             if debug:
                 logger.info(f"BuscadorProp: {base_url}")
             

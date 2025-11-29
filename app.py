@@ -12,8 +12,18 @@ import shutil
 # Detectar si estamos en Streamlit Cloud
 IS_STREAMLIT_CLOUD = os.environ.get('STREAMLIT_SERVER_HEADLESS') == 'true' or os.path.exists('/home/appuser')
 
-# Si estamos en cloud, ejecutar fix_chromedriver una sola vez para instalar ChromeDriver correcto
+# En Streamlit Cloud, preparar webdriver-manager ANTES de que se intente usar
 if IS_STREAMLIT_CLOUD:
+    # Establecer variables de entorno para webdriver-manager
+    os.environ['WDM_CACHE_DIR'] = '/tmp/.wdm_cache'
+    os.environ['WDM_LOG_LEVEL'] = 'INFO'
+    
+    # Crear directorio de cache si no existe
+    try:
+        os.makedirs('/tmp/.wdm_cache', exist_ok=True)
+    except:
+        pass
+    
     try:
         import subprocess
         import sys
@@ -21,9 +31,9 @@ if IS_STREAMLIT_CLOUD:
         result = subprocess.run([sys.executable, "fix_chromedriver.py"], 
                               capture_output=True, text=True, timeout=60)
         if result.returncode == 0:
-            print("✅ ChromeDriver configurado correctamente")
+            print("✅ ChromeDriver preparado para Streamlit Cloud")
         else:
-            print(f"⚠️ Warning en fix_chromedriver: {result.stderr}")
+            print(f"⚠️ Warning en fix_chromedriver: {result.stderr[:200]}")
     except Exception as e:
         print(f"⚠️ No se pudo ejecutar fix_chromedriver.py: {e}")
 
