@@ -502,10 +502,24 @@ def cargar_sistema():
     logger.info("Creando colección nueva...")
     try:
         chroma_client.delete_collection("propiedades")
-    except:
-        pass
+    except Exception as e:
+        logger.debug(f"No se pudo eliminar colección anterior: {e}")
     
-    collection = chroma_client.create_collection("propiedades")
+    # Intentar crear con manejo de errores
+    try:
+        collection = chroma_client.create_collection("propiedades")
+    except Exception as e:
+        # Si falla, intentar obtener la colección existente
+        logger.warning(f"Error creando colección: {e}. Intentando obtener existente...")
+        try:
+            collection = chroma_client.get_collection("propiedades")
+            # Si existe, limpiarla completamente
+            collection.delete(where={})
+            logger.info("Colección limpiada para insertar datos nuevos")
+        except Exception as e2:
+            logger.error(f"Error crítico con ChromaDB: {e2}")
+            raise
+    
     logger.info(f"Agregando {len(df)} propiedades a ChromaDB...")
     
     for i, row in df.iterrows():
@@ -550,54 +564,65 @@ bd_vacia = df_propiedades.empty
 
 # Sincronización de ChromaDB con BD actual
 if not bd_vacia:
-    docs_chroma = collection.count()
-    docs_csv = len(df_propiedades)
-    
-    # Log de sincronización
-    if docs_chroma != docs_csv:
-        logger.warning(f"⚠️ SYNC ERROR: ChromaDB tiene {docs_chroma} docs pero CSV tiene {docs_csv}. Regenerando...")
-        # Regenerar ChromaDB completo
-        try:
-            chroma_client = chromadb.PersistentClient(path="data/chroma_data")
-            chroma_client.delete_collection("propiedades")
-            
-            # Reconstruir embeddings
-            from sentence_transformers import SentenceTransformer
-            def make_text(row):
-                desc = row.get('descripcion', '') if isinstance(row, dict) else row['descripcion']
-                return f"{row['tipo']} en {row['zona']}. {desc}"
-            
-            df_propiedades['text'] = df_propiedades.apply(make_text, axis=1)
-            embeddings = model.encode(df_propiedades['text'].tolist())
-            
-            collection = chroma_client.create_collection("propiedades")
-            logger.info(f"Agregando {len(df_propiedades)} propiedades a ChromaDB...")
-            
-            for i, row in df_propiedades.iterrows():
-                row_id = str(row['id']).strip() if row['id'] else None
-                if not row_id or row_id == "nan" or row_id == "None":
-                    continue
+    try:
+        docs_chroma = collection.count()
+        docs_csv = len(df_propiedades)
+        
+        # Log de sincronización
+        if docs_chroma != docs_csv:
+            logger.warning(f"⚠️ SYNC ERROR: ChromaDB tiene {docs_chroma} docs pero CSV tiene {docs_csv}. Regenerando...")
+            # Regenerar ChromaDB completo
+            try:
+                chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+                try:
+                    chroma_client.delete_collection("propiedades")
+                except:
+                    pass
                 
-                metadata = row.to_dict()
-                for key in metadata:
-                    if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
-                        metadata[key] = ""
+                # Reconstruir embeddings
+                from sentence_transformers import SentenceTransformer
+                def make_text(row):
+                    desc = row.get('descripcion', '') if isinstance(row, dict) else row['descripcion']
+                    return f"{row['tipo']} en {row['zona']}. {desc}"
+                
+                df_propiedades['text'] = df_propiedades.apply(make_text, axis=1)
+                embeddings = model.encode(df_propiedades['text'].tolist())
                 
                 try:
-                    collection.add(
-                        documents=[row['text']],
-                        embeddings=[embeddings[i]],
-                        metadatas=[metadata],
-                        ids=[row_id]
-                    )
+                    collection = chroma_client.create_collection("propiedades")
                 except:
-                    continue
-            
-            logger.info(f"✅ ChromaDB regenerado con {collection.count()} documentos")
-        except Exception as e:
-            logger.error(f"Error regenerando ChromaDB: {e}")
-    else:
-        logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
+                    collection = chroma_client.get_collection("propiedades")
+                    collection.delete(where={})
+                
+                logger.info(f"Agregando {len(df_propiedades)} propiedades a ChromaDB...")
+                
+                for i, row in df_propiedades.iterrows():
+                    row_id = str(row['id']).strip() if row['id'] else None
+                    if not row_id or row_id == "nan" or row_id == "None":
+                        continue
+                    
+                    metadata = row.to_dict()
+                    for key in metadata:
+                        if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
+                            metadata[key] = ""
+                    
+                    try:
+                        collection.add(
+                            documents=[row['text']],
+                            embeddings=[embeddings[i]],
+                            metadatas=[metadata],
+                            ids=[row_id]
+                        )
+                    except:
+                        continue
+                
+                logger.info(f"✅ ChromaDB regenerado con {collection.count()} documentos")
+            except Exception as e:
+                logger.error(f"Error regenerando ChromaDB: {e}")
+        else:
+            logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
+    except Exception as e:
+        logger.warning(f"Error en sincronización de ChromaDB: {e}")
 
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
