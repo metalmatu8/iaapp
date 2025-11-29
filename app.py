@@ -467,8 +467,11 @@ def cargar_sistema():
     df = df.reset_index(drop=True)
     
     if df.empty:
-        logger.error("No se encontraron propiedades válidas después de filtrar")
-        return None, None, None
+        logger.warning("No se encontraron propiedades válidas. Inicializando con BD vacía")
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        # Retornar sin colección si la BD está vacía
+        return model, None, pd.DataFrame()
     
     logger.info(f"Cargadas {len(df)} propiedades de BD SQLite")
     
@@ -554,9 +557,9 @@ def cargar_sistema():
 
 model, collection, df_propiedades = cargar_sistema()
 
-# Validar que se cargó correctamente
-if model is None or collection is None:
-    st.error("❌ Error: No se pudo cargar la base de datos. Verifica que exista data/properties.db")
+# Validar que se cargó correctamente - solo model es crítico
+if model is None:
+    st.error("❌ Error: No se pudo cargar el modelo. Verifica que exista data/properties.db")
     st.stop()
 
 # df_propiedades puede estar vacío inicialmente (usuario descargará propiedades después)
@@ -565,8 +568,8 @@ if df_propiedades is None:
 
 bd_vacia = df_propiedades.empty
 
-# Sincronización de ChromaDB con BD actual
-if not bd_vacia:
+# Sincronización de ChromaDB con BD actual (solo si collection no es None)
+if not bd_vacia and collection is not None:
     try:
         docs_chroma = collection.count()
         docs_csv = len(df_propiedades)
