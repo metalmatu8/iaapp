@@ -17,6 +17,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Limpiar caché de funciones para evitar inconsistencias con ChromaDB
+@st.cache_resource(show_spinner=False)
+def init_app():
+    """Función para inicializar la aplicación una sola vez"""
+    return True
+
+init_app()
+
 # CSS personalizado para diseño premium
 st.markdown("""
 <style>
@@ -481,11 +489,12 @@ def cargar_sistema():
         logger.info(f"Colección existente encontrada con {docs_existentes} documentos")
         
         # IMPORTANTE: Si tiene menos documentos que la BD actual, regenerar
-        # Esto evita cachés obsoletos o incompletos
-        if docs_existentes >= len(df) * 0.8:  # Si tiene al menos 80% de las propiedades, usar
+        # Comparar con el número real de propiedades en el CSV
+        if docs_existentes == len(df):  # Solo usar si tiene EXACTAMENTE el mismo número
+            logger.info(f"ChromaDB actualizado y sincronizado ({docs_existentes} docs)")
             return model, collection, df
         else:
-            logger.warning(f"Colección incompleta ({docs_existentes}/{len(df)} docs). Regenerando...")
+            logger.warning(f"Discrepancia detectada: ChromaDB tiene {docs_existentes} docs pero CSV tiene {len(df)}. Regenerando...")
     except:
         pass
     
@@ -538,6 +547,57 @@ if df_propiedades is None:
     df_propiedades = pd.DataFrame()
 
 bd_vacia = df_propiedades.empty
+
+# Sincronización de ChromaDB con BD actual
+if not bd_vacia:
+    docs_chroma = collection.count()
+    docs_csv = len(df_propiedades)
+    
+    # Log de sincronización
+    if docs_chroma != docs_csv:
+        logger.warning(f"⚠️ SYNC ERROR: ChromaDB tiene {docs_chroma} docs pero CSV tiene {docs_csv}. Regenerando...")
+        # Regenerar ChromaDB completo
+        try:
+            chroma_client = chromadb.PersistentClient(path="data/chroma_data")
+            chroma_client.delete_collection("propiedades")
+            
+            # Reconstruir embeddings
+            from sentence_transformers import SentenceTransformer
+            def make_text(row):
+                desc = row.get('descripcion', '') if isinstance(row, dict) else row['descripcion']
+                return f"{row['tipo']} en {row['zona']}. {desc}"
+            
+            df_propiedades['text'] = df_propiedades.apply(make_text, axis=1)
+            embeddings = model.encode(df_propiedades['text'].tolist())
+            
+            collection = chroma_client.create_collection("propiedades")
+            logger.info(f"Agregando {len(df_propiedades)} propiedades a ChromaDB...")
+            
+            for i, row in df_propiedades.iterrows():
+                row_id = str(row['id']).strip() if row['id'] else None
+                if not row_id or row_id == "nan" or row_id == "None":
+                    continue
+                
+                metadata = row.to_dict()
+                for key in metadata:
+                    if metadata[key] is None or (isinstance(metadata[key], float) and pd.isna(metadata[key])):
+                        metadata[key] = ""
+                
+                try:
+                    collection.add(
+                        documents=[row['text']],
+                        embeddings=[embeddings[i]],
+                        metadatas=[metadata],
+                        ids=[row_id]
+                    )
+                except:
+                    continue
+            
+            logger.info(f"✅ ChromaDB regenerado con {collection.count()} documentos")
+        except Exception as e:
+            logger.error(f"Error regenerando ChromaDB: {e}")
+    else:
+        logger.info(f"✅ ChromaDB sincronizado: {docs_chroma} documentos")
 
 # Funciones de búsqueda
 def buscar_propiedades(query, k=5):
@@ -1266,17 +1326,20 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
             localidades_list = ["Todas", "Palermo", "Recoleta", "San Isidro", "Belgrano", "Flores", 
                                "Caballito", "La Boca", "San Telmo", "Villa Crespo", "Colegiales",
                                "Lomas de Zamora", "Temperley", "La Matanza"]
+            default_localidad = ["Palermo"]
         else:
             # Obtener localidades de la provincia seleccionada
             municipios = geo_data.get("municipios_por_provincia", {}).get(provincia, [])
             localidades_list = ["Todas"] + [m["nombre"] for m in municipios]
+            # Usar la primera localidad (que no sea "Todas") como default
+            default_localidad = [localidades_list[1]] if len(localidades_list) > 1 else ["Todas"]
         
         localidad_seleccionada = st.multiselect(
             "📍 Localidad",
             localidades_list,
-            default=["Palermo"]
+            default=default_localidad
         )
-        localidades_seleccionadas = localidad_seleccionada if localidad_seleccionada else ["Palermo"]
+        localidades_seleccionadas = localidad_seleccionada if localidad_seleccionada else default_localidad
         
         limite = st.number_input("📊 Cantidad", 1, 100, 10)
         
@@ -1331,28 +1394,31 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_container.progress(porcentaje_zona / 100.0, text=f"📍 Descargando **{localidad}**... ({idx + 1}/{len(localidades_seleccionadas)} zonas)")
                     details_container.info(f"⏳ Buscando propiedades de {localidad}...")
                     
-                    # Descargar propiedades
-                    props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
-                    
-                    # Mostrar contador durante descarga
-                    props_encontradas = len(props)
-                    total_descargadas += props_encontradas
-                    
-                    stats_container.metric(
-                        f"🏠 {localidad}",
-                        f"{props_encontradas} propiedades encontradas"
-                    )
-                    
-                    nuevas = db.agregar_propiedades(props)
-                    total_nuevas += nuevas
-                    
-                    # Actualizar detalles con información detallada
-                    details_container.success(
-                        f"✓ {localidad}: "
-                        f"**{props_encontradas}** encontradas → "
-                        f"**{nuevas}** nuevas agregadas | "
-                        f"Total acumulado: **{total_nuevas}**"
-                    )
+                    try:
+                        # Descargar propiedades
+                        props = BuscadorPropScraper.buscar_propiedades(zona=localidad, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                        
+                        # Mostrar contador durante descarga
+                        props_encontradas = len(props)
+                        total_descargadas += props_encontradas
+                        
+                        stats_container.metric(
+                            f"🏠 {localidad}",
+                            f"{props_encontradas} propiedades encontradas"
+                        )
+                        
+                        nuevas = db.agregar_propiedades(props)
+                        total_nuevas += nuevas
+                        
+                        # Actualizar detalles con información detallada
+                        details_container.success(
+                            f"✓ {localidad}: "
+                            f"**{props_encontradas}** encontradas → "
+                            f"**{nuevas}** nuevas agregadas | "
+                            f"Total acumulado: **{total_nuevas}**"
+                        )
+                    except Exception as zone_error:
+                        details_container.warning(f"⚠️ {localidad}: {str(zone_error)}")
                     
                     # Actualizar barra DESPUÉS de descargar esta zona
                     porcentaje_completado = ((idx + 1) / len(localidades_seleccionadas)) * 100
@@ -1451,19 +1517,35 @@ with st.sidebar.expander("Descargar de Internet", expanded=False):
                     progress_container.progress(porcentaje_zona / 100.0, text=f"📍 Descargando **{zona}**... ({idx + 1}/{len(zonas_seleccionadas)} zonas)")
                     details_container.info(f"⏳ Buscando propiedades de {zona}...")
                     
-                    # Descargar propiedades
-                    props = BuscadorPropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                    try:
+                        # Descargar propiedades
+                        props = BuscadorPropScraper.buscar_propiedades(zona=zona, tipo=tipo_prop.lower(), limit=limite, debug=True, stop_flag=st.session_state)
+                        
+                        # Mostrar contador durante descarga
+                        props_encontradas = len(props)
+                        total_descargadas += props_encontradas
+                        
+                        stats_container.metric(
+                            f"🏠 {zona}",
+                            f"{props_encontradas} propiedades encontradas"
+                        )
+                        
+                        nuevas = db.agregar_propiedades(props)
+                        total_nuevas += nuevas
+                        
+                        # Actualizar detalles con información detallada
+                        details_container.success(
+                            f"✓ {zona}: "
+                            f"**{props_encontradas}** encontradas → "
+                            f"**{nuevas}** nuevas agregadas | "
+                            f"Total acumulado: **{total_nuevas}**"
+                        )
+                    except Exception as zone_error:
+                        details_container.warning(f"⚠️ {zona}: {str(zone_error)}")
                     
-                    # Mostrar contador durante descarga
-                    props_encontradas = len(props)
-                    total_descargadas += props_encontradas
-                    
-                    stats_container.metric(
-                        f"🏠 {zona}",
-                        f"{props_encontradas} propiedades encontradas"
-                    )
-                    
-                    nuevas = db.agregar_propiedades(props)
+                    # Actualizar barra DESPUÉS de descargar esta zona
+                    porcentaje_completado = ((idx + 1) / len(zonas_seleccionadas)) * 100
+                    progress_container.progress(porcentaje_completado / 100.0, text=f"✅ **{total_descargadas}** propiedades descargadas ({int(porcentaje_completado)}%)")
                     total_nuevas += nuevas
                     
                     # Actualizar detalles con información detallada
